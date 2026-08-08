@@ -113,12 +113,19 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
     <ClCompile Include="Input\Input.cpp" />
     <ClCompile Include="Level\Level.cpp" />
     <ClCompile Include="Math\Vector2.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="Render\Renderer.cpp" />
     <ClCompile Include="Render\ScreenBuffer.cpp" />
+    <ClCompile Include="Source\Actor\Actor.cpp" />
+    <ClCompile Include="Source\Core\Core.cpp" />
+    <ClCompile Include="Source\Core\CraftObject.cpp" />
+    <ClCompile Include="Source\Engine\Engine.cpp" />
+    <ClCompile Include="Source\Input\Input.cpp" />
+    <ClCompile Include="Source\Level\Level.cpp" />
+    <ClCompile Include="Source\Math\Vector2.cpp" />
+    <ClCompile Include="Source\pch.cpp" />
+    <ClCompile Include="Source\Render\Renderer.cpp" />
+    <ClCompile Include="Source\Render\ScreenBuffer.cpp" />
+    <ClCompile Include="Source\Utils\CorePch.cpp" />
     <ClCompile Include="Utils\CorePch.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -132,9 +139,22 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
     <ClInclude Include="Math\Vector2.h" />
     <ClInclude Include="Render\Renderer.h" />
     <ClInclude Include="Render\ScreenBuffer.h" />
+    <ClInclude Include="Source\Actor\Actor.h" />
+    <ClInclude Include="Source\Core\Core.h" />
+    <ClInclude Include="Source\Core\CraftObject.h" />
+    <ClInclude Include="Source\Engine\Engine.h" />
+    <ClInclude Include="Source\Input\Input.h" />
+    <ClInclude Include="Source\Level\Level.h" />
+    <ClInclude Include="Source\Math\Color.h" />
+    <ClInclude Include="Source\Math\Vector2.h" />
+    <ClInclude Include="Source\pch.h" />
+    <ClInclude Include="Source\Render\Renderer.h" />
+    <ClInclude Include="Source\Render\ScreenBuffer.h" />
+    <ClInclude Include="Source\Utils\CorePch.h" />
+    <ClInclude Include="Source\Utils\EngineMacro.h" />
+    <ClInclude Include="Source\Utils\Types.h" />
     <ClInclude Include="Utils\CorePch.h" />
     <ClInclude Include="Utils\EngineMacro.h" />
-    <ClInclude Include="pch.h" />
     <ClInclude Include="Utils\Types.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
