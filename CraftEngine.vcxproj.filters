@@ -15,34 +15,37 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Engine\Engine.cpp">
+    <ClCompile Include="Source\Actor\Actor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Actor\Actor.cpp">
+    <ClCompile Include="Source\Core\Core.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Level\Level.cpp">
+    <ClCompile Include="Source\Core\CraftObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Input\Input.cpp">
+    <ClCompile Include="Source\Engine\Engine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\CorePch.cpp">
+    <ClCompile Include="Source\Input\Input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Math\Vector2.cpp">
+    <ClCompile Include="Source\Level\Level.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Render\Renderer.cpp">
+    <ClCompile Include="Source\Math\Vector2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Render\ScreenBuffer.cpp">
+    <ClCompile Include="Source\Render\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\CraftObject.cpp">
+    <ClCompile Include="Source\Render\ScreenBuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Core\Core.cpp">
+    <ClCompile Include="Source\Utils\CorePch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\pch.cpp">
@@ -80,43 +83,46 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Engine\Engine.h">
+    <ClInclude Include="Source\Actor\Actor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\EngineMacro.h">
+    <ClInclude Include="Source\Core\Core.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\Types.h">
+    <ClInclude Include="Source\Core\CraftObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Actor\Actor.h">
+    <ClInclude Include="Source\Engine\Engine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Level\Level.h">
+    <ClInclude Include="Source\Input\Input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Input\Input.h">
+    <ClInclude Include="Source\Level\Level.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\CorePch.h">
+    <ClInclude Include="Source\Math\Color.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Math\Vector2.h">
+    <ClInclude Include="Source\Math\Vector2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Math\Color.h">
+    <ClInclude Include="Source\Render\Renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Render\Renderer.h">
+    <ClInclude Include="Source\Render\ScreenBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Render\ScreenBuffer.h">
+    <ClInclude Include="Source\Utils\CorePch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\CraftObject.h">
+    <ClInclude Include="Source\Utils\EngineMacro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\Core.h">
+    <ClInclude Include="Source\Utils\Types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\pch.h">

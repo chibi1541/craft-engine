@@ -60,7 +60,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(projectDir)Source</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -70,11 +70,10 @@
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PreBuildEvent>
-      <Command>CALL $(SolutionDir)$(ProjectName)\ProcIncludes.bat
-xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
+      <Command>CALL $(ProjectDir)ProcPrebuild.bat</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy $(OutDir)*.lib ..\Lib\ /e /y /i</Command>
+      <Command>xcopy $(OutDir)*.lib ..\..\Lib\ /e /y /i</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -88,7 +87,7 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(projectDir)Source</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -98,23 +97,13 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
     <PreBuildEvent>
-      <Command>CALL $(SolutionDir)$(ProjectName)\ProcIncludes.bat
-xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
+      <Command>CALL $(ProjectDir)ProcPrebuild.bat</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy $(OutDir)*.lib ..\Lib\ /e /y /i</Command>
+      <Command>xcopy $(OutDir)*.lib ..\..\Lib\ /e /y /i</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Actor\Actor.cpp" />
-    <ClCompile Include="Core\Core.cpp" />
-    <ClCompile Include="Core\CraftObject.cpp" />
-    <ClCompile Include="Engine\Engine.cpp" />
-    <ClCompile Include="Input\Input.cpp" />
-    <ClCompile Include="Level\Level.cpp" />
-    <ClCompile Include="Math\Vector2.cpp" />
-    <ClCompile Include="Render\Renderer.cpp" />
-    <ClCompile Include="Render\ScreenBuffer.cpp" />
     <ClCompile Include="Source\Actor\Actor.cpp" />
     <ClCompile Include="Source\Core\Core.cpp" />
     <ClCompile Include="Source\Core\CraftObject.cpp" />
@@ -122,23 +111,14 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
     <ClCompile Include="Source\Input\Input.cpp" />
     <ClCompile Include="Source\Level\Level.cpp" />
     <ClCompile Include="Source\Math\Vector2.cpp" />
-    <ClCompile Include="Source\pch.cpp" />
+	<ClCompile Include="Source\pch.cpp">
+		  <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+	</ClCompile>
     <ClCompile Include="Source\Render\Renderer.cpp" />
     <ClCompile Include="Source\Render\ScreenBuffer.cpp" />
     <ClCompile Include="Source\Utils\CorePch.cpp" />
-    <ClCompile Include="Utils\CorePch.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Actor\Actor.h" />
-    <ClInclude Include="Core\Core.h" />
-    <ClInclude Include="Core\CraftObject.h" />
-    <ClInclude Include="Engine\Engine.h" />
-    <ClInclude Include="Input\Input.h" />
-    <ClInclude Include="Level\Level.h" />
-    <ClInclude Include="Math\Color.h" />
-    <ClInclude Include="Math\Vector2.h" />
-    <ClInclude Include="Render\Renderer.h" />
-    <ClInclude Include="Render\ScreenBuffer.h" />
     <ClInclude Include="Source\Actor\Actor.h" />
     <ClInclude Include="Source\Core\Core.h" />
     <ClInclude Include="Source\Core\CraftObject.h" />
@@ -153,9 +133,6 @@ xcopy ..\Config\* $(OutDir)..\Config\ /e /y /i</Command>
     <ClInclude Include="Source\Utils\CorePch.h" />
     <ClInclude Include="Source\Utils\EngineMacro.h" />
     <ClInclude Include="Source\Utils\Types.h" />
-    <ClInclude Include="Utils\CorePch.h" />
-    <ClInclude Include="Utils\EngineMacro.h" />
-    <ClInclude Include="Utils\Types.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
