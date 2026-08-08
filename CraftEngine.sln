@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.8.12023.21 stable
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CraftEngine", "CraftEngine.vcxproj", "{F443F73B-649C-42C8-905B-314443B0D37D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F443F73B-649C-42C8-905B-314443B0D37D}.Debug|x64.ActiveCfg = Debug|x64
+		{F443F73B-649C-42C8-905B-314443B0D37D}.Debug|x64.Build.0 = Debug|x64
+		{F443F73B-649C-42C8-905B-314443B0D37D}.Release|x64.ActiveCfg = Release|x64
+		{F443F73B-649C-42C8-905B-314443B0D37D}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4D72E664-51FA-4945-8670-F54D7D18FEEE}
+	EndGlobalSection
+EndGlobal
