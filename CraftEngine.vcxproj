@@ -104,6 +104,10 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Source\Anim\Animation.cpp" />
+    <ClCompile Include="Source\Anim\AnimationClip.cpp" />
+    <ClCompile Include="Source\Asset\Image.cpp" />
+    <ClCompile Include="Source\Component\ActorComponent.cpp" />
     <ClCompile Include="Source\Actor\Actor.cpp" />
     <ClCompile Include="Source\Core\Core.cpp" />
     <ClCompile Include="Source\Core\CraftObject.cpp" />
@@ -111,14 +115,19 @@
     <ClCompile Include="Source\Input\Input.cpp" />
     <ClCompile Include="Source\Level\Level.cpp" />
     <ClCompile Include="Source\Math\Vector2.cpp" />
-	<ClCompile Include="Source\pch.cpp">
-		  <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-	</ClCompile>
+    <ClCompile Include="Source\pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Source\Render\Renderer.cpp" />
     <ClCompile Include="Source\Render\ScreenBuffer.cpp" />
     <ClCompile Include="Source\Utils\CorePch.cpp" />
+    <ClCompile Include="Source\Xml\XmlParser.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Anim\Animation.h" />
+    <ClInclude Include="Source\Anim\AnimationClip.h" />
+    <ClInclude Include="Source\Asset\Image.h" />
+    <ClInclude Include="Source\Component\ActorComponent.h" />
     <ClInclude Include="Source\Actor\Actor.h" />
     <ClInclude Include="Source\Core\Core.h" />
     <ClInclude Include="Source\Core\CraftObject.h" />
@@ -132,7 +141,13 @@
     <ClInclude Include="Source\Render\ScreenBuffer.h" />
     <ClInclude Include="Source\Utils\CorePch.h" />
     <ClInclude Include="Source\Utils\EngineMacro.h" />
+    <ClInclude Include="Source\Utils\FileUtils.h" />
     <ClInclude Include="Source\Utils\Types.h" />
+    <ClInclude Include="Source\Xml\rapidxml.hpp" />
+    <ClInclude Include="Source\Xml\rapidxml_iterators.hpp" />
+    <ClInclude Include="Source\Xml\rapidxml_print.hpp" />
+    <ClInclude Include="Source\Xml\rapidxml_utils.hpp" />
+    <ClInclude Include="Source\Xml\XmlParser.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

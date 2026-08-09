@@ -67,7 +67,7 @@ void ScreenBuffer::Draw(const CHAR_INFO* const charInfo) const
 	SMALL_RECT rect = {/*left*/0, /*top*/0, /*right*/static_cast<short>(size.x - 1), /*bottom*/static_cast<short>(size.y - 1) };
 
 	// 콘솔에 CHAR_INFO 타입으로 글자 쓰는 함수
-	BOOL result = WriteConsoleOutputA(
+	BOOL result = WriteConsoleOutputW(
 		buffer,
 		charInfo,
 		size,

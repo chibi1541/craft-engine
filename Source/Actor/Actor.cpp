@@ -5,7 +5,7 @@
 
 NAME_SPACE_BEGIN(Craft)
 
-Actor::Actor(const std::string& image, const Vector2& position, Color color)
+Actor::Actor(const std::wstring& image, const Vector2& position, Color color)
 	: image(image), position(position), color(color), width(static_cast<int>(image.size()))
 {
 

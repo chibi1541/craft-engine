@@ -80,7 +80,7 @@ Renderer::~Renderer()
 }
 
 void Renderer::Submit(
-	const std::string& image,
+	const std::wstring& image,
 	const Vector2& position,
 	Color color,
 	int sortingOrder)
@@ -136,6 +136,8 @@ void Renderer::DrawRenderQueue()
 			continue;
 		}
 
+
+
 		// TODO : 프로젝트 할 때 복수 문자로 Actor 표현 하려면 컬링 로직 손봐야 함
 		{
 			// y위치가 화면을 벗어났으면 컬링
@@ -165,14 +167,21 @@ void Renderer::DrawRenderQueue()
 			// 범위를 벗어나는 문자를 잘라내도록 screenSize.x - 1 만큼으로 범위를 좁힘
 			const int visibleEnd = endX >= screenSize.x ? screenSize.x - 1 : endX;
 
+			//temp : 개행 처리
+			int lineIndex = 0;
+			int xIdx = 0;
+
 			// 문자열을 루프 순회하면서 글자를 2차월 배열에 하나씩 기록
 			for (int x = visibleStart; x <= visibleEnd; ++x)
 			{
+
 				// 문자열에서 글자값을 가져올 때 사용할 인덱스
 				const int sourceIndex = x - startX;
 
 				// 글자 2차월 배열의 인덱스
-				const int index = (command.position.y * screenSize.x) + x;
+				const int index = ((command.position.y + lineIndex) * screenSize.x) + xIdx;
+
+				++xIdx;
 
 				// 정렬 순서를 비교해서 그릴지 말지를 판정.
 				if (frame->sortingOrderArray[index] > command.sortingOrder)
@@ -181,8 +190,16 @@ void Renderer::DrawRenderQueue()
 					continue;
 				}
 
+				// temp : 개행 처리
+				if(command.image[sourceIndex] == L'\n')
+				{
+					++lineIndex;
+					xIdx = 0;
+					continue;
+				}
+
 				// 2차원 배열에 글자, 속성 설정
-				frame->charInfoArray[index].Char.AsciiChar = command.image[sourceIndex];
+				frame->charInfoArray[index].Char.UnicodeChar = command.image[sourceIndex];
 
 				// 글자 색상 값 설정
 				frame->charInfoArray[index].Attributes = static_cast<DWORD>(command.color);
