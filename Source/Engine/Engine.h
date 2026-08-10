@@ -26,8 +26,6 @@ class CRAFT_API Engine
 		int height = 0;
 	};
 
-private:
-
 public:
 	Engine();
 	virtual ~Engine();
@@ -51,6 +49,8 @@ public:
 
 	inline int GetWidth() const { return setting.width; }
 	inline int GetHeight() const { return setting.height; }
+
+	std::shared_ptr<Level> GetLevel();
 
 protected:
 	// 입력 처리(폴링 방식 vs 이벤트)

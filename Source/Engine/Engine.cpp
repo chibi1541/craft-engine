@@ -140,6 +140,13 @@ Engine& Engine::Get()
 	return *instance;
 }
 
+std::shared_ptr<Level> Engine::GetLevel()
+{
+	ASSERT_CRASH(mainLevel || nextLevel);
+
+	return (mainLevel) ? mainLevel : nextLevel;
+}
+
 void Engine::ProcessInput()
 {
 	ASSERT_CRASH(input != nullptr);
