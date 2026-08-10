@@ -90,12 +90,6 @@
     <ClCompile Include="Source\Asset\Image.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Anim\Animation.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Anim\AnimationClip.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Actor\Actor.h">
@@ -134,9 +128,6 @@
     <ClInclude Include="Source\Utils\EngineMacro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Utils\Types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -179,9 +170,6 @@
     <ClInclude Include="Source\Utils\EngineMacro.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Utils\Types.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Xml\rapidxml.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -206,10 +194,7 @@
     <ClInclude Include="Source\Asset\Image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Anim\Animation.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Anim\AnimationClip.h">
+    <ClInclude Include="Source\Utils\Types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

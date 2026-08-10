@@ -168,8 +168,8 @@ void Renderer::DrawRenderQueue()
 			const int visibleEnd = endX >= screenSize.x ? screenSize.x - 1 : endX;
 
 			//temp : 개행 처리
-			int lineIndex = 0;
-			int xIdx = 0;
+			//int lineIndex = 0;
+			//int xIdx = 0;
 
 			// 문자열을 루프 순회하면서 글자를 2차월 배열에 하나씩 기록
 			for (int x = visibleStart; x <= visibleEnd; ++x)
@@ -179,9 +179,9 @@ void Renderer::DrawRenderQueue()
 				const int sourceIndex = x - startX;
 
 				// 글자 2차월 배열의 인덱스
-				const int index = ((command.position.y + lineIndex) * screenSize.x) + xIdx;
+				const int index = ((command.position.y /*+ lineIndex*/) * screenSize.x) + x;
 
-				++xIdx;
+				//++xIdx;
 
 				// 정렬 순서를 비교해서 그릴지 말지를 판정.
 				if (frame->sortingOrderArray[index] > command.sortingOrder)
@@ -191,12 +191,12 @@ void Renderer::DrawRenderQueue()
 				}
 
 				// temp : 개행 처리
-				if(command.image[sourceIndex] == L'\n')
-				{
-					++lineIndex;
-					xIdx = 0;
-					continue;
-				}
+				//if(command.image[sourceIndex] == L'\n')
+				//{
+				//	++lineIndex;
+				//	xIdx = 0;
+				//	continue;
+				//}
 
 				// 2차원 배열에 글자, 속성 설정
 				frame->charInfoArray[index].Char.UnicodeChar = command.image[sourceIndex];

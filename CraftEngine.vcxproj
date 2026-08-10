@@ -44,12 +44,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)Intermediate\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)Intermediate\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)Bin\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)Intermediate\$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)Bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)Intermediate\$(Configuration)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -73,7 +73,7 @@
       <Command>CALL $(ProjectDir)ProcPrebuild.bat</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy $(OutDir)*.lib ..\..\Lib\ /e /y /i</Command>
+      <Command>xcopy $(OutDir)*.lib ..\..\Libraries\Libs\$(ProjectName)\$(Configuration)\ /e /y /i</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -100,12 +100,10 @@
       <Command>CALL $(ProjectDir)ProcPrebuild.bat</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>xcopy $(OutDir)*.lib ..\..\Lib\ /e /y /i</Command>
+      <Command>xcopy $(OutDir)*.lib ..\..\Libraries\Libs\$(ProjectName)\$(Configuration)\ /e /y /i</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Anim\Animation.cpp" />
-    <ClCompile Include="Source\Anim\AnimationClip.cpp" />
     <ClCompile Include="Source\Asset\Image.cpp" />
     <ClCompile Include="Source\Component\ActorComponent.cpp" />
     <ClCompile Include="Source\Actor\Actor.cpp" />
@@ -124,8 +122,6 @@
     <ClCompile Include="Source\Xml\XmlParser.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Anim\Animation.h" />
-    <ClInclude Include="Source\Anim\AnimationClip.h" />
     <ClInclude Include="Source\Asset\Image.h" />
     <ClInclude Include="Source\Component\ActorComponent.h" />
     <ClInclude Include="Source\Actor\Actor.h" />

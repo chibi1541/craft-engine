@@ -12,7 +12,6 @@
 #include <string>
 
 #include "Utils/EngineMacro.h"
-#include "Utils/Types.h"
 #include "Utils/FileUtils.h"
 #include "Xml/XmlParser.h"
 #include "Actor/Actor.h"
