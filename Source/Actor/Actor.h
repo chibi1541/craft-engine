@@ -36,7 +36,7 @@ public:
 	inline void SetOwner(std::weak_ptr<Level> newOwner) { owner = newOwner; }
 
 	inline Vector2 GetPosition() const { return position; }
-	void SetPosition(const Vector2& newPosition);
+ 	virtual void SetPosition(const Vector2& newPosition);
 
 protected:
 	// BeginPlay

@@ -71,6 +71,28 @@ public:
 		return nullptr;
 	}
 
+	template<typename T,
+		typename = std::enable_if_t<std::is_base_of<Actor, T>::value>>
+		vector<std::shared_ptr<T>> FindActors()
+
+	{
+		vector<std::shared_ptr<T>> ret;
+
+		// 검색 - 형변환
+		for (const auto& actor : actorList)
+		{
+			// T 타입으로 형변환 시도
+			std::shared_ptr<T> targetActor = std::dynamic_pointer_cast<T>(actor);
+
+			if (targetActor)
+			{
+				ret.push_back(targetActor);
+			}
+		}
+
+		return ret;
+	}
+
 
 	// getter/setter
 	inline bool HasInitialized() const { return hasInitialized; }
