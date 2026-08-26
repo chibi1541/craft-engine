@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include <memory>
 
 using namespace std;
@@ -145,7 +145,13 @@ double XmlNode::GetDoubleValue(double defaultValue)
 
 const WCHAR* XmlNode::GetStringValue(const WCHAR* defaultValue)
 {
-	WCHAR* val = _node->first_node()->value();
+	// <Frame></Frame> 처럼 내용이 비어있으면 자식 노드가 없다.
+	// 그대로 value()를 부르면 에러가 나니 기본값을 돌려준다.
+	XmlNodeType* valueNode = _node->first_node();
+	if (valueNode == nullptr)
+		return defaultValue;
+
+	WCHAR* val = valueNode->value();
 	if (val)
 		return val;
 

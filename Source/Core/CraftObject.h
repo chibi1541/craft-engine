@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "Core/Core.h"
 #include <memory>
 
 NAME_SPACE_BEGIN(Craft)

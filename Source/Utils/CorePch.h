@@ -14,6 +14,5 @@
 #include "Utils/EngineMacro.h"
 #include "Utils/FileUtils.h"
 #include "Xml/XmlParser.h"
-#include "Actor/Actor.h"
 #include "Math/Vector2.h"
-#include "Level/Level.h"
+#include "Utils/json.hpp"

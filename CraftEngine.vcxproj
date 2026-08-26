@@ -104,15 +104,20 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Source\Animation\AnimationPlayer.cpp" />
+    <ClCompile Include="Source\Asset\AnimationClip.cpp" />
     <ClCompile Include="Source\Asset\Image.cpp" />
+    <ClCompile Include="Source\Asset\Sprite.cpp" />
+    <ClCompile Include="Source\Asset\SpriteAnimationLoader.cpp" />
     <ClCompile Include="Source\Component\ActorComponent.cpp" />
+    <ClCompile Include="Source\Component\SpriteAnimatorComponent.cpp" />
     <ClCompile Include="Source\Actor\Actor.cpp" />
-    <ClCompile Include="Source\Core\Core.cpp" />
     <ClCompile Include="Source\Core\CraftObject.cpp" />
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Input\Input.cpp" />
     <ClCompile Include="Source\Level\Level.cpp" />
     <ClCompile Include="Source\Math\Palette.cpp" />
+    <ClCompile Include="Source\Math\SymbolPalette.cpp" />
     <ClCompile Include="Source\Math\Vector2.cpp" />
     <ClCompile Include="Source\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -123,16 +128,21 @@
     <ClCompile Include="Source\Xml\XmlParser.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Animation\AnimationPlayer.h" />
+    <ClInclude Include="Source\Asset\AnimationClip.h" />
     <ClInclude Include="Source\Asset\Image.h" />
+    <ClInclude Include="Source\Asset\Sprite.h" />
+    <ClInclude Include="Source\Asset\SpriteAnimationLoader.h" />
     <ClInclude Include="Source\Component\ActorComponent.h" />
+    <ClInclude Include="Source\Component\SpriteAnimatorComponent.h" />
     <ClInclude Include="Source\Actor\Actor.h" />
-    <ClInclude Include="Source\Core\Core.h" />
     <ClInclude Include="Source\Core\CraftObject.h" />
     <ClInclude Include="Source\Engine\Engine.h" />
     <ClInclude Include="Source\Input\Input.h" />
     <ClInclude Include="Source\Level\Level.h" />
     <ClInclude Include="Source\Math\Color.h" />
     <ClInclude Include="Source\Math\Palette.h" />
+    <ClInclude Include="Source\Math\SymbolPalette.h" />
     <ClInclude Include="Source\Math\Vector2.h" />
     <ClInclude Include="Source\pch.h" />
     <ClInclude Include="Source\Render\Renderer.h" />
@@ -140,6 +150,7 @@
     <ClInclude Include="Source\Utils\CorePch.h" />
     <ClInclude Include="Source\Utils\EngineMacro.h" />
     <ClInclude Include="Source\Utils\FileUtils.h" />
+    <ClInclude Include="Source\Utils\json.hpp" />
     <ClInclude Include="Source\Utils\Types.h" />
     <ClInclude Include="Source\Xml\rapidxml.hpp" />
     <ClInclude Include="Source\Xml\rapidxml_iterators.hpp" />

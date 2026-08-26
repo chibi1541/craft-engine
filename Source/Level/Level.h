@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-
+#include "Core/CraftObject.h"
 
 NAME_SPACE_BEGIN(Craft)
 
