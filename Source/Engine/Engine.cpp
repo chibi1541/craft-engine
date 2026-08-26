@@ -3,6 +3,7 @@
 #include "Level/Level.h"
 #include "Input/Input.h"
 #include "Render/Renderer.h"
+#include "Math/Palette.h"
 
 #include <memory>
 
@@ -17,6 +18,11 @@ Engine::Engine()
 
 	// 엔진 설정 로드
 	LoadEngineSetting();
+
+	// 팔레트 로드.
+	// ScreenBuffer 생성자가 팔레트를 읽으므로 Renderer보다 먼저 불러야 한다.
+	// 실패해도 기본 팔레트로 동작하므로 반환값은 확인하지 않는다.
+	Palette::LoadFromFile(L"../Config/Palette.xml");
 
 	// 입력 객체 생성
 	input = std::make_unique<Input>();
@@ -68,6 +74,9 @@ void Engine::Run()
 		// 고정 프레임
 		if (deltaTime >= oneFrameTime)
 		{
+			// 프레임 수 측정
+			UpdateFps(deltaTime);
+
 			// 2. 게임 이벤트 호출
 			OnInitialized();
 
@@ -207,7 +216,37 @@ void Engine::Draw()
 	if (!renderer)
 		return;
 
+	// 프레임 수 표시.
+	// 어떤 액터에도 가려지지 않도록 정렬 순서를 최대로 준다.
+	if (showFps)
+	{
+		char text[32] = {};
+		sprintf_s(text, "FPS %.1f", currentFps);
+
+		renderer->Submit(text, Vector2::Zero, Color::White, INT_MAX);
+	}
+
 	renderer->Draw();
+}
+
+void Engine::UpdateFps(float deltaTime)
+{
+	++fpsFrameCount;
+	fpsElapsedTime += deltaTime;
+
+	// 갱신 주기. 너무 짧으면 숫자가 흔들려서 읽기 힘들다.
+	const float updateInterval = 0.5f;
+
+	if (fpsElapsedTime < updateInterval)
+	{
+		return;
+	}
+
+	// 모아둔 프레임 수를 경과 시간으로 나눠서 초당 프레임 수를 구한다.
+	currentFps = static_cast<float>(fpsFrameCount) / fpsElapsedTime;
+
+	fpsFrameCount = 0;
+	fpsElapsedTime = 0.0f;
 }
 
 void Engine::SavePreviousInputState()

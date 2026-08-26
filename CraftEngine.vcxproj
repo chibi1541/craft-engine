@@ -112,6 +112,7 @@
     <ClCompile Include="Source\Engine\Engine.cpp" />
     <ClCompile Include="Source\Input\Input.cpp" />
     <ClCompile Include="Source\Level\Level.cpp" />
+    <ClCompile Include="Source\Math\Palette.cpp" />
     <ClCompile Include="Source\Math\Vector2.cpp" />
     <ClCompile Include="Source\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -131,6 +132,7 @@
     <ClInclude Include="Source\Input\Input.h" />
     <ClInclude Include="Source\Level\Level.h" />
     <ClInclude Include="Source\Math\Color.h" />
+    <ClInclude Include="Source\Math\Palette.h" />
     <ClInclude Include="Source\Math\Vector2.h" />
     <ClInclude Include="Source\pch.h" />
     <ClInclude Include="Source\Render\Renderer.h" />

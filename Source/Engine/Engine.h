@@ -50,6 +50,12 @@ public:
 	inline int GetWidth() const { return setting.width; }
 	inline int GetHeight() const { return setting.height; }
 
+	// 현재 프레임 수
+	inline float GetFps() const { return currentFps; }
+
+	// 화면에 프레임 수를 표시할지 여부
+	inline void SetShowFps(bool show) { showFps = show; }
+
 	std::shared_ptr<Level> GetLevel();
 
 protected:
@@ -72,6 +78,9 @@ protected:
 
 	// 프레임 간 입력 값 저장을 위함 함수(입력의 변화를 체크하기 위함)
 	void SavePreviousInputState();
+
+	// 프레임 수 측정 함수
+	void UpdateFps(float deltaTime);
 
 	// 엔진 종료 시 리소스 정리
 	void Shutdown();
@@ -98,6 +107,16 @@ protected:
 	std::unique_ptr<Input> input;
 
 	std::unique_ptr<Renderer> renderer;
+
+	// 화면에 프레임 수를 표시할지 여부
+	bool showFps = true;
+
+	// 프레임 수 측정용 누적값.
+	// 매 프레임 값을 그대로 쓰면 숫자가 심하게 흔들려서 읽기 어려우므로
+	// 일정 시간 동안 모아서 평균을 낸다.
+	float fpsElapsedTime = 0.0f;
+	int fpsFrameCount = 0;
+	float currentFps = 0.0f;
 
 private:
 

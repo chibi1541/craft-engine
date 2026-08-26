@@ -3,7 +3,7 @@
 
 NAME_SPACE_BEGIN(Craft)
 
-Image::Image(const WCHAR* image, uint16 raw, uint16 col)
+Image::Image(const char* image, uint16 raw, uint16 col)
 	:_image(image), _raw(raw), _col(col)
 {
 	

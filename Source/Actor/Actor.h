@@ -13,7 +13,7 @@ class CRAFT_API Actor : public CraftObject
 	TYPE_DECLARATIONS(Actor, CraftObject)
 
 public:
-	Actor( const std::wstring& image = L"", const Vector2& position = Vector2::Zero, Color color = Color::White);
+	Actor( const std::string& image = "", const Vector2& position = Vector2::Zero, Color color = Color::White);
 	virtual ~Actor();
 
 	// 게임 플레이 이벤트 함수.
@@ -55,7 +55,7 @@ protected:
 	std::weak_ptr<Level> owner;
 
 	// 실제 화면에 그릴 글자
-	std::wstring image;
+	std::string image;
 
 	// 글자 색상
 	Color color = Color::White;

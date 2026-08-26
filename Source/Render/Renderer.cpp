@@ -19,11 +19,15 @@ Renderer::Frame::~Frame()
 
 }
 
-void Renderer::Frame::Clear(const Vector2& screenSize)
+void Renderer::Frame::Clear(const Vector2& screenSize, Color backgroundColor)
 {
 	// 이중 루프를 순회하면서 값 초기화
 	const int width = screenSize.x;
 	const int height = screenSize.y;
+
+	// 배경색은 전경색 비트를 배경색 자리로 옮겨서 사용.
+	// 공백 문자 + 배경색이라 화면 전체가 그 색으로 칠해진다.
+	const WORD backgroundAttribute = ToBackgroundAttribute(backgroundColor);
 
 	for (int y = 0; y < height;++y)
 	{
@@ -33,8 +37,7 @@ void Renderer::Frame::Clear(const Vector2& screenSize)
 
 			CHAR_INFO& info = charInfoArray[index];
 			info.Char.AsciiChar = ' ';
-			// 색상 표기를 안함
-			info.Attributes = 0;
+			info.Attributes = backgroundAttribute;
 
 			sortingOrderArray[index] = -1;
 		}
@@ -50,18 +53,22 @@ Renderer::Renderer(const Vector2& screenSize) : screenSize(screenSize)
 	ASSERT_CRASH(!instance);
 	instance = this;
 
-	const int bufferCount = screenSize.x * screenSize.y;
+	// 이중 버퍼 구현을 위한 콘솔 버퍼 생성 및 초기화.
+	// 요청한 크기가 화면에 안 들어가면 ScreenBuffer가 줄여서 잡으므로,
+	// 먼저 하나를 만들어서 실제로 잡힌 크기를 확정한 뒤 나머지를 맞춘다.
+	// (Frame과 ScreenBuffer의 크기가 어긋나면 그리기가 화면 밖으로 나간다)
+	screenBufferArray[0] = std::make_unique<ScreenBuffer>(screenSize);
+	this->screenSize = screenBufferArray[0]->GetSize();
+	screenBufferArray[0]->Clear();
+
+	screenBufferArray[1] = std::make_unique<ScreenBuffer>(this->screenSize);
+	screenBufferArray[1]->Clear();
+
+	const int bufferCount = this->screenSize.x * this->screenSize.y;
 	frame = std::make_unique<Frame>(bufferCount);
 
 	// 생성 후 프레임 지우기
-	frame->Clear(screenSize);
-
-	// 이중 버퍼 구현을 위한 콘솔 버퍼 생성 및 초기화
-	screenBufferArray[0] = std::make_unique<ScreenBuffer>(screenSize);
-	screenBufferArray[0]->Clear();
-
-	screenBufferArray[1] = std::make_unique<ScreenBuffer>(screenSize);
-	screenBufferArray[1]->Clear();
+	frame->Clear(this->screenSize, clearColor);
 
 	currentBufferIndex = 0;
 	// 화면에 0번 콘솔 버퍼 활성화
@@ -80,20 +87,81 @@ Renderer::~Renderer()
 }
 
 void Renderer::Submit(
-	const std::wstring& image,
+	const std::string& image,
 	const Vector2& position,
 	Color color,
 	int sortingOrder)
 {
-	// 렌더 명령 생성 및 값 설정.
-	RenderCommand command;
-	command.image = image;
-	command.position = position;
-	command.color = color;
-	command.sortingOrder = sortingOrder;
+	// 개행 문자(\n) 기준으로 줄 단위로 쪼개서 각 줄을 별도의 RenderCommand로 큐에 추가.
+	// 이렇게 하면 DrawRenderQueue()의 한 줄 처리 로직(컬링/클리핑/z-order)을
+	// 그대로 재사용할 수 있음.
+	ForEachLine(image, [&](const std::string& line, int lineOffset)
+	{
+		// 렌더 명령 생성 및 값 설정.
+		RenderCommand command;
+		command.image = line;
+		command.position = Vector2(position.x, position.y + lineOffset);
+		command.color = color;
+		command.sortingOrder = sortingOrder;
 
-	// 렌더 큐에 명령 추가.
-	renderQueue.emplace_back(command);
+		// 렌더 큐에 명령 추가.
+		renderQueue.emplace_back(std::move(command));
+	});
+}
+
+void Renderer::SubmitPixels(
+	const std::string& pixelMap,
+	const std::unordered_map<char, Color>& palette,
+	const Vector2& position,
+	int sortingOrder,
+	char transparentSymbol,
+	int scaleX,
+	int scaleY)
+{
+	ASSERT_CRASH(scaleX >= 1 && scaleY >= 1);
+
+	ForEachLine(pixelMap, [&](const std::string& line, int lineOffset)
+	{
+		// 한 줄의 색상 배열을 가로 배율만큼 늘려서 만든다.
+		std::vector<std::optional<Color>> lineColors;
+		lineColors.reserve(line.size() * scaleX);
+
+		for (char symbol : line)
+		{
+			std::optional<Color> cell;
+
+			if (symbol != transparentSymbol)
+			{
+				auto it = palette.find(symbol);
+				// 팔레트에 없는 기호 - 오타 등 즉시 확인
+				ASSERT_CRASH(it != palette.end());
+				cell = it->second;
+			}
+
+			// 픽셀 하나를 가로로 scaleX칸 반복
+			for (int repeatX = 0; repeatX < scaleX; ++repeatX)
+			{
+				lineColors.emplace_back(cell);
+			}
+		}
+
+		// 컬링/클리핑 로직은 image.length()를 기준으로 동작하므로,
+		// pixelColors와 같은 길이의 더미 문자열을 채워 기존 로직과 호환시킴.
+		// (실제 그려지는 문자는 DrawRenderQueue()에서 항상 공백으로 덮어씀)
+		const std::string dummyImage(lineColors.size(), ' ');
+
+		// 같은 줄을 세로로 scaleY번 반복해서 큐에 넣는다.
+		for (int repeatY = 0; repeatY < scaleY; ++repeatY)
+		{
+			RenderCommand command;
+			command.position = Vector2(position.x, position.y + (lineOffset * scaleY) + repeatY);
+			command.sortingOrder = sortingOrder;
+			command.pixelColors = lineColors;
+			command.image = dummyImage;
+
+			renderQueue.emplace_back(std::move(command));
+		}
+	});
 }
 
 void Renderer::Draw()
@@ -118,7 +186,7 @@ Renderer& Renderer::Get()
 void Renderer::Clear()
 {
 	// 프레딤 값 초기화
-	frame->Clear(screenSize);
+	frame->Clear(screenSize, clearColor);
 
 	// 콘솔 버퍼 초기화
 	GetCurrentBuffer()->Clear();
@@ -136,9 +204,6 @@ void Renderer::DrawRenderQueue()
 			continue;
 		}
 
-
-
-		// TODO : 프로젝트 할 때 복수 문자로 Actor 표현 하려면 컬링 로직 손봐야 함
 		{
 			// y위치가 화면을 벗어났으면 컬링
 			if (command.position.y < 0 || command.position.y >= screenSize.y)
@@ -167,9 +232,8 @@ void Renderer::DrawRenderQueue()
 			// 범위를 벗어나는 문자를 잘라내도록 screenSize.x - 1 만큼으로 범위를 좁힘
 			const int visibleEnd = endX >= screenSize.x ? screenSize.x - 1 : endX;
 
-			//temp : 개행 처리
-			//int lineIndex = 0;
-			//int xIdx = 0;
+			// 픽셀(배경색) 렌더 명령인지 여부 - pixelColors가 채워져 있으면 픽셀 경로.
+			const bool isPixelCommand = !command.pixelColors.empty();
 
 			// 문자열을 루프 순회하면서 글자를 2차월 배열에 하나씩 기록
 			for (int x = visibleStart; x <= visibleEnd; ++x)
@@ -179,9 +243,13 @@ void Renderer::DrawRenderQueue()
 				const int sourceIndex = x - startX;
 
 				// 글자 2차월 배열의 인덱스
-				const int index = ((command.position.y /*+ lineIndex*/) * screenSize.x) + x;
+				const int index = (command.position.y * screenSize.x) + x;
 
-				//++xIdx;
+				// 투명 픽셀은 z-order도 건드리지 않고 완전히 건너뜀
+				if (isPixelCommand && !command.pixelColors[sourceIndex].has_value())
+				{
+					continue;
+				}
 
 				// 정렬 순서를 비교해서 그릴지 말지를 판정.
 				if (frame->sortingOrderArray[index] > command.sortingOrder)
@@ -190,19 +258,20 @@ void Renderer::DrawRenderQueue()
 					continue;
 				}
 
-				// temp : 개행 처리
-				//if(command.image[sourceIndex] == L'\n')
-				//{
-				//	++lineIndex;
-				//	xIdx = 0;
-				//	continue;
-				//}
+				if (isPixelCommand)
+				{
+					// 글자는 공백으로 채우고 배경색만 보이게 함
+					frame->charInfoArray[index].Char.AsciiChar = ' ';
+					frame->charInfoArray[index].Attributes = ToBackgroundAttribute(*command.pixelColors[sourceIndex]);
+				}
+				else
+				{
+					// 2차원 배열에 글자, 속성 설정
+					frame->charInfoArray[index].Char.AsciiChar = command.image[sourceIndex];
 
-				// 2차원 배열에 글자, 속성 설정
-				frame->charInfoArray[index].Char.UnicodeChar = command.image[sourceIndex];
-
-				// 글자 색상 값 설정
-				frame->charInfoArray[index].Attributes = static_cast<DWORD>(command.color);
+					// 글자 색상 값 설정
+					frame->charInfoArray[index].Attributes = static_cast<WORD>(command.color);
+				}
 
 				// 그리기 우선순위 값 설정
 				frame->sortingOrderArray[index] = command.sortingOrder;
