@@ -119,22 +119,28 @@ void AnimInstance::Composite()
 
 		if (nullptr != overlaySprite && !overlaySprite->IsEmpty() && nullptr != overlayState)
 		{
-			// 같은 캐릭터의 레이어끼리는 크기가 같아야 합성이 성립한다.
-			// 다르면 어느 칸을 어디에 겹칠지 정할 방법이 없으므로 데이터 실수로 본다.
-			// TODO : 가로 가변 폭을 지원하면 이 가로 검사를 풀고
-			//        캔버스 폭을 BaseLayer/Overlay 각각의 [-pivotX, width-pivotX) 합집합으로 잡는다.
-			ASSERT_CRASH(overlaySprite->GetWidth() == compositeWidth);
+			// 높이는 캐릭터별로 고정이라 그대로 같아야 한다(가변은 폭만).
 			ASSERT_CRASH(overlaySprite->GetHeight() == compositeHeight);
 
-			// 크기가 같은데 피벗이 다르면 두 클립을 어긋나게 겹쳐야 한다.
-			// 아트 정렬 실수를 여기서 잡는다.
 			const AnimationClip* overlayClip = overlayLayer.player.GetClip().get();
 
+			const float overlayPivotX = (nullptr != overlayClip)
+				? overlayClip->GetPivotX() : AnimationClip::GetDefaultPivotX(overlaySprite->GetWidth());
+
+			// 세로 피벗은 여전히 일치해야 한다 - 높이가 고정이라 어긋나면 아트 정렬 실수다.
 			if (nullptr != overlayClip)
 			{
-				ASSERT_CRASH(overlayClip->GetPivotX() == compositePivotX);
 				ASSERT_CRASH(overlayClip->GetPivotY() == compositePivotY);
 			}
+
+			// 피벗이 가리키는 지점(발밑 등)이 같은 세계 좌표를 가리키도록 BaseLayer 좌표계로 옮긴다.
+			// BaseLayer가 Overlay보다 넓은 클립(Attack 등)이면 이 오프셋만큼 안쪽으로 들어가서
+			// 자리 잡고, Overlay가 닿지 않는 양 끝은 처음에 복사해 둔 BaseLayer 그림이 그대로 남는다.
+			//
+			// 정수 칸으로 안 맞아떨어지면(너비 홀짝이 서로 다름) 가장 가까운 칸으로 반올림한다 -
+			// 최대 반 칸 오차가 생길 수 있지만 크래시시키지 않는다.
+			const int columnOffset =
+				static_cast<int>(::floorf((compositePivotX - overlayPivotX) + 0.5f));
 
 			for (int row = 0; row < compositeHeight; ++row)
 			{
@@ -144,9 +150,18 @@ void AnimInstance::Composite()
 					continue;
 				}
 
-				for (int col = 0; col < compositeWidth; ++col)
+				for (int overlayCol = 0; overlayCol < overlaySprite->GetWidth(); ++overlayCol)
 				{
-					const char symbol = overlaySprite->GetPixel(row, col);
+					const int baseCol = overlayCol + columnOffset;
+
+					// BaseLayer 캔버스 밖으로 나가면 잘라낸다 - Overlay가 BaseLayer보다
+					// 넓어서 양쪽으로 넘치는 경우, 넘친 열은 그냥 버려진다.
+					if (baseCol < 0 || baseCol >= compositeWidth)
+					{
+						continue;
+					}
+
+					const char symbol = overlaySprite->GetPixel(row, overlayCol);
 
 					// canBlend가 true(기본값)면 불투명한 칸만 덮는다 - 예전 Overlay 모드.
 					// 투명한 칸으로는 BaseLayer가 그대로 비친다.
@@ -159,7 +174,9 @@ void AnimInstance::Composite()
 						continue;
 					}
 
-					compositeBuffer[overlaySprite->GetPixelIndex(row, col)] = symbol;
+					// 쓰기는 compositeBuffer(=BaseLayer)의 stride를 써야 한다.
+					// overlaySprite::GetPixelIndex를 그대로 쓰면 폭이 다를 때 엉뚱한 칸에 쓰게 된다.
+					compositeBuffer[row * (compositeWidth + 1) + baseCol] = symbol;
 				}
 			}
 		}
