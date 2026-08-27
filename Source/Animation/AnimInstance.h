@@ -8,53 +8,19 @@
 #include "Asset/AnimationClip.h"
 #include <string>
 #include <memory>
-#include <vector>
 #include <unordered_map>
 
 NAME_SPACE_BEGIN(Craft)
 
-// 레이어가 담당하는 행 범위. [startRow, endRow] 양끝 포함.
-//
-// 본이 없는 2D 픽셀에서 언리얼의 Layered blend per bone에 대응하는 것이 행 마스크다.
-// 8x8 캐릭터면 0~3행이 상체, 4~7행이 하체쯤 된다.
-struct CRAFT_API AnimLayerMask
-{
-	int startRow = 0;
-
-	// -1이면 스프라이트 끝까지(= 전체).
-	int endRow = -1;
-
-	bool Contains(int row) const;
-};
-
-// 레이어가 자기 담당 행을 어떻게 합칠지.
-enum class AnimBlendMode
-{
-	// 마스크 행을 통째로 소유한다. 투명한 칸까지 그대로 반영돼서 아래 레이어를 지운다.
-	// 신체 부위 분리(상체는 공격, 하체는 걷기)가 이쪽이다.
-	// 언리얼의 Layered blend per bone과 같은 의미.
-	Replace,
-
-	// 불투명한 칸만 덮어쓴다. 투명한 칸으로는 아래 레이어가 비친다.
-	// 전신 위에 이펙트를 얹는 용도.
-	//
-	// 주의 - 이 모드로는 픽셀을 지울 수 없다.
-	// 아래 레이어에 있는 것을 없애는 동작(다리를 드느라 다리 픽셀을 빼는 등)은
-	// 아래 레이어가 그대로 남아서 화면상 아무 일도 일어나지 않는다.
-	Overlay,
-};
-
 // 상태 머신 하나와 그 재생 상태를 묶은 단위.
-// 레이어를 여러 개 두고 합성하면 "상체는 공격, 하체는 걷기"가 된다.
+//
+// 5단계부터 AnimInstance는 이 타입을 정확히 2개(BaseLayer/Overlay) 고정으로 갖는다.
+// 그래서 이름표나 마스크/블렌딩 같은 "역할을 구분하기 위한" 필드가 필요 없다 -
+// 역할은 AnimInstance::GetBaseLayer() / GetOverlayLayer() 중 어느 쪽으로 접근했느냐로 정해지고,
+// 영역(rows)과 블렌딩 여부는 지금 재생 중인 AnimState가 들고 있다(AnimState::region/canBlend).
 class CRAFT_API AnimLayer
 {
 public:
-	std::string name;
-
-	AnimLayerMask mask;
-
-	AnimBlendMode blendMode = AnimBlendMode::Replace;
-
 	AnimStateMachine stateMachine;
 
 	AnimationPlayer player;
@@ -70,6 +36,18 @@ public:
 //
 // SpriteAnimatorComponent는 이걸 소유해서 매 틱 Tick()을 돌리고,
 // Draw에서 GetCurrentPixelMap()이 내놓은 결과만 화면에 제출한다.
+//
+// ★ 레이어는 정확히 2개, 역할이 고정이다 ★
+//   BaseLayer : 항상 존재하고 항상 전신을 담당한다. 최우선 기준.
+//               현재 상태의 canBlend가 false면 Overlay를 통째로 숨긴다
+//               (구르기/사망/피격경직처럼 전신이 하나로 통일돼야 하는 상태).
+//   Overlay   : 선택. 상태 머신이 비어 있으면(HasOverlayLayer()==false) 그냥 안 쓰인다.
+//               현재 상태의 region이 담당 행, canBlend가 그 안에서 투명을 살릴지(true)
+//               통째로 가져갈지(false)를 정한다.
+//
+// 예전에는 레이어를 N개까지 두는 vector<AnimLayer>였지만, 2개를 넘길 일이 없고
+// "레이어에 고정된 마스크"로는 오버레이 하나로 여러 다른 모양의 겹침을 표현할 수 없어서
+// (예: 다리만 겹치는 상태와 상체만 겹치는 상태를 같은 Overlay 슬롯에서 오가는 것) 이렇게 굳혔다.
 class CRAFT_API AnimInstance
 {
 public:
@@ -78,12 +56,8 @@ public:
 
 	// 복사 금지.
 	//
-	// 실용적인 이유 - 레이어를 unique_ptr로 담고 있어서 애초에 복사가 안 된다.
-	// 명시하지 않으면 CRAFT_API(dllexport)가 암시적 복사 대입까지 만들어내려 하다가
-	// 컴파일 에러가 난다. dllexport는 암시 멤버를 전부 실체화하기 때문이다.
-	//
-	// 의미적인 이유 - AnimInstance는 특정 액터의 "지금 재생 상태"다.
-	// 통째로 복사해서 쓸 물건이 아니다.
+	// 실용적인 이유 - AnimLayer는 복사 가능하지만(더 이상 unique_ptr을 안 씀),
+	// AnimInstance는 여전히 특정 액터의 "지금 재생 상태"라 통째로 복사해서 쓸 물건이 아니다.
 	AnimInstance(const AnimInstance&) = delete;
 	AnimInstance& operator=(const AnimInstance&) = delete;
 
@@ -97,15 +71,13 @@ public:
 	inline int GetClipCount() const { return static_cast<int>(clipMap.size()); }
 	inline bool HasClip(const std::string& name) const { return clipMap.find(name) != clipMap.end(); }
 
-	// 레이어 추가. 추가한 순서가 곧 합성 순서이고, 뒤에 넣은 레이어가 위에 덮인다.
-	AnimLayer& AddLayer(
-		const std::string& name,
-		const AnimLayerMask& mask,
-		AnimBlendMode blendMode = AnimBlendMode::Replace
-	);
-	AnimLayer* FindLayer(const std::string& name);
-	AnimLayer* GetLayer(int index);
-	inline int GetLayerCount() const { return static_cast<int>(layers.size()); }
+	// 레이어 접근. 둘 다 항상 존재하는 객체를 돌려준다 - Overlay를 안 쓰면
+	// 그냥 상태 머신이 비어 있는 채로 남아서 Tick/Composite에서 조용히 무시된다.
+	inline AnimLayer& GetBaseLayer() { return baseLayer; }
+	inline const AnimLayer& GetBaseLayer() const { return baseLayer; }
+	inline AnimLayer& GetOverlayLayer() { return overlayLayer; }
+	inline const AnimLayer& GetOverlayLayer() const { return overlayLayer; }
+	inline bool HasOverlayLayer() const { return !overlayLayer.stateMachine.IsEmpty(); }
 
 	// 평가 -> 재생 -> 합성. 매 틱 한 번.
 	void Tick(float deltaTime);
@@ -115,7 +87,7 @@ public:
 
 	// 좌우 반전. 아트가 그려진 방향이 false다.
 	//
-	// 합성이 끝난 뒤 결과를 한 번만 뒤집는다. 레이어별로 뒤집지 않는 이유는
+	// 합성이 끝난 뒤 결과를 한 번만 뒤집는다. BaseLayer/Overlay를 따로 뒤집지 않는 이유는
 	// 마스크가 행 기준이라 가로 반전과 무관해서 결과가 같고, 한 번이면 충분하기 때문이다.
 	// Renderer도 건드릴 필요가 없다.
 	void SetFlipX(bool newFlipX);
@@ -132,7 +104,7 @@ private:
 	// 레이어 하나의 상태를 갱신한다(전이 평가 -> 클립 적용 -> 시간 전진).
 	void TickLayer(AnimLayer& layer, float deltaTime);
 
-	// 레이어들의 현재 프레임을 마스크대로 겹쳐서 compositeBuffer를 만든다.
+	// BaseLayer를 깔고, 허용되면 Overlay의 담당 영역을 얹어 compositeBuffer를 만든다.
 	void Composite();
 
 private:
@@ -140,14 +112,13 @@ private:
 
 	AnimParameters parameters;
 
-	// 순서 = 합성 순서. AnimLayer는 덩치가 있고 참조를 돌려주므로
-	// vector 재할당에도 주소가 안 바뀌도록 unique_ptr로 담는다.
-	std::vector<std::unique_ptr<AnimLayer>> layers;
+	AnimLayer baseLayer;
+	AnimLayer overlayLayer;
 
 	// 매 프레임 문자열을 새로 만들지 않도록 재사용하는 합성 버퍼.
 	std::string compositeBuffer;
 
-	// 합성 결과의 크기와 피벗. Composite()가 채운다.
+	// 합성 결과의 크기와 피벗. Composite()가 채운다. 둘 다 BaseLayer의 현재 클립을 따른다.
 	int compositeWidth = 0;
 	int compositeHeight = 0;
 	float compositePivotX = 0.0f;

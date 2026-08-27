@@ -86,16 +86,9 @@ bool SpriteAnimatorComponent::PlayClip(const std::string& name, bool forceRestar
 		return false;
 	}
 
-	AnimLayer* layer = animInstance.GetLayer(0);
-
-	// 상태 머신을 안 쓰는 액터를 위해 전체를 담당하는 기본 레이어를 만들어 준다.
-	if (nullptr == layer)
-	{
-		layer = &animInstance.AddLayer("Base", AnimLayerMask());
-	}
-
+	// BaseLayer는 항상 존재한다. 상태 머신을 안 쓰는 액터도 이 경로로 클립 하나만 직접 튼다.
 	// 같은 클립이면 Play()가 알아서 무시한다.
-	layer->player.Play(clip, forceRestart);
+	animInstance.GetBaseLayer().player.Play(clip, forceRestart);
 
 	return true;
 }

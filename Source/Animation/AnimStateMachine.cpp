@@ -3,6 +3,22 @@
 
 NAME_SPACE_BEGIN(Craft)
 
+bool AnimLayerMask::Contains(int row) const
+{
+	if (row < startRow)
+	{
+		return false;
+	}
+
+	// endRow가 -1이면 끝까지 담당한다.
+	if (endRow >= 0 && row > endRow)
+	{
+		return false;
+	}
+
+	return true;
+}
+
 void AnimStateMachine::AddState(const AnimState& state)
 {
 	states.emplace_back(state);

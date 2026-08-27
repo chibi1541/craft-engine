@@ -8,6 +8,24 @@
 
 NAME_SPACE_BEGIN(Craft)
 
+// 레이어가 담당하는 행 범위. [startRow, endRow] 양끝 포함.
+//
+// 본이 없는 2D 픽셀에서 언리얼의 Layered blend per bone에 대응하는 것이 행 마스크다.
+// 8x8 캐릭터면 0~3행이 상체, 4~7행이 하체쯤 된다.
+//
+// 5단계부터는 AnimLayer가 아니라 AnimState가 이 값을 갖는다.
+// (Overlay 레이어의 어느 상태냐에 따라 담당 영역이 달라질 수 있어서다.
+// BaseLayer는 항상 전신을 담당하므로 이 값을 갖지 않는다.)
+struct CRAFT_API AnimLayerMask
+{
+	int startRow = 0;
+
+	// -1이면 스프라이트 끝까지(= 전체).
+	int endRow = -1;
+
+	bool Contains(int row) const;
+};
+
 // 상태 하나. "이 상태일 때는 이 클립을 튼다"가 전부다.
 // 상태가 하는 일이 이것뿐이라 클립 재생은 AnimationPlayer가, 전이는 AnimStateMachine이 맡는다.
 struct CRAFT_API AnimState
@@ -16,6 +34,20 @@ struct CRAFT_API AnimState
 
 	// AnimInstance에 등록된 클립 이름. (AnimationClip::GetName())
 	std::string clipName;
+
+	// Overlay 레이어의 상태에서만 의미가 있다. 이 상태가 담당하는 행 범위.
+	// BaseLayer는 항상 전신을 담당하므로 이 값은 무시된다.
+	AnimLayerMask region;
+
+	// 레이어 역할에 따라 뜻이 다르다. (AnimInstance.h의 Composite 주석 참고)
+	//
+	//   BaseLayer 상태   : true(기본값)면 Overlay를 평소대로 얹는다.
+	//                      false면 이 상태가 재생되는 동안 Overlay를 통째로 숨긴다.
+	//                      구르기/사망/피격경직처럼 전신이 한 클립으로 통일돼야 하는 상태에 쓴다.
+	//   Overlay 상태     : true(기본값)면 투명한 칸으로 BaseLayer가 비친다.
+	//                      false면 담당 행(region)을 통째로 가져가 BaseLayer를 완전히 가린다.
+	//                      다리를 드느라 픽셀을 "빼는" 표현은 false가 아니면 반영되지 않는다.
+	bool canBlend = true;
 };
 
 // 상태 사이의 화살표.

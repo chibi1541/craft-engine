@@ -92,22 +92,28 @@ namespace
 		return mask;
 	}
 
-	// "replace" / "overlay" / "" 를 합성 모드로 바꾼다.
-	AnimBlendMode ParseBlendMode(const std::string& text)
+	// "true" / "false" / "" 를 bool로 바꾼다. 생략(빈 문자열)이면 defaultValue.
+	// AnimState::canBlend가 기본값 true인 것과 짝을 이룬다 - blend를 안 쓰면 항상 true다.
+	bool ParseBool(const std::string& text, bool defaultValue)
 	{
-		if (text.empty() || text == "replace")
+		if (text.empty())
 		{
-			return AnimBlendMode::Replace;
+			return defaultValue;
 		}
 
-		if (text == "overlay")
+		if (text == "true")
 		{
-			return AnimBlendMode::Overlay;
+			return true;
 		}
 
-		CheckOrCrash(false, "unknown blend mode '" + text + "' (use 'replace' or 'overlay')");
+		if (text == "false")
+		{
+			return false;
+		}
 
-		return AnimBlendMode::Replace;
+		CheckOrCrash(false, "expected 'true' or 'false', got '" + text + "'");
+
+		return defaultValue;
 	}
 
 	// 파라미터 기본값을 읽는다. true/false도 받는다.
@@ -146,18 +152,33 @@ namespace
 	}
 
 	// 상태 하나를 검증해서 레이어에 넣는다.
+	//
+	// layerRoleName은 "Base" 또는 "Overlay" - 에러 메시지용.
+	// isBaseLayer가 true인데 hasRowsDeclared도 true면 크래시한다.
+	// Base는 항상 전신을 담당해서 rows가 의미 없는 자리인데, 실수로 적었을 가능성이 높다.
 	// isEmptyState면 클립을 틀지 않는 상태가 된다.
-	void AddStateChecked(AnimLayer& outLayer, AnimState state, bool isEmptyState, const AnimInstance& instance)
+	void AddStateChecked(
+		AnimLayer& outLayer,
+		const char* layerRoleName,
+		bool isBaseLayer,
+		AnimState state,
+		bool isEmptyState,
+		bool hasRowsDeclared,
+		const AnimInstance& instance)
 	{
 		CheckOrCrash(!state.name.empty(), "state has no name");
 
 		CheckOrCrash(!outLayer.stateMachine.HasState(state.name),
-			"duplicate state name '" + state.name + "' in layer '" + outLayer.name + "'");
+			"duplicate state name '" + state.name + "' in layer '" + layerRoleName + "'");
+
+		CheckOrCrash(!(isBaseLayer && hasRowsDeclared),
+			"state '" + state.name + "' in layer 'Base' declares rows, but Base always covers "
+			"the whole sprite - rows only means something on Overlay");
 
 		if (isEmptyState)
 		{
 			// 아무것도 출력하지 않는 상태.
-			// 이 레이어는 그 동안 합성에서 통째로 건너뛰어져서 아래 레이어가 그대로 비친다.
+			// Overlay에서는 합성이 통째로 건너뛰어져서 Base가 그대로 비친다.
 			// (언리얼로 치면 base pose로 블렌드 아웃하는 자리)
 			state.clipName.clear();
 		}
@@ -176,16 +197,17 @@ namespace
 	}
 
 	// 전이 하나를 검증해서 레이어에 넣는다.
-	void AddTransitionChecked(AnimLayer& outLayer, const AnimTransition& transition)
+	void AddTransitionChecked(AnimLayer& outLayer, const char* layerRoleName, const AnimTransition& transition)
 	{
 		// from은 비어있어도 된다(Any State). to는 반드시 있어야 한다.
 		CheckOrCrash(outLayer.stateMachine.HasState(transition.toStateName),
-			"transition target state '" + transition.toStateName + "' not found in layer '" + outLayer.name + "'");
+			"transition target state '" + transition.toStateName + "' not found in layer '" + layerRoleName + "'");
 
 		if (!transition.fromStateName.empty())
 		{
 			CheckOrCrash(outLayer.stateMachine.HasState(transition.fromStateName),
-				"transition source state '" + transition.fromStateName + "' not found in layer '" + outLayer.name + "'");
+				"transition source state '" + transition.fromStateName + "' not found in layer '"
+				+ layerRoleName + "'");
 		}
 
 		outLayer.stateMachine.AddTransition(transition);
@@ -221,12 +243,17 @@ namespace
 	}
 
 	// <States> 를 읽어 상태 머신에 채운다. entry 상태 이름을 반환.
-	std::string LoadXmlStates(XmlNode& layerNode, AnimLayer& outLayer, const AnimInstance& instance)
+	std::string LoadXmlStates(
+		XmlNode& layerNode,
+		AnimLayer& outLayer,
+		const char* layerRoleName,
+		bool isBaseLayer,
+		const AnimInstance& instance)
 	{
 		XmlNode statesNode = layerNode.FindChild(L"States");
 
 		// 상태가 없는 레이어는 아무것도 못 한다.
-		CheckOrCrash(statesNode.IsValid(), "layer '" + outLayer.name + "' has no <States>");
+		CheckOrCrash(statesNode.IsValid(), "layer '" + std::string(layerRoleName) + "' has no <States>");
 
 		for (XmlNode& stateNode : statesNode.FindChildren(L"State"))
 		{
@@ -234,16 +261,25 @@ namespace
 			state.name = ToNarrow(stateNode.GetStringAttr(L"name", L""));
 			state.clipName = ToNarrow(stateNode.GetStringAttr(L"clip", L""));
 
-			AddStateChecked(outLayer, state, stateNode.GetBoolAttr(L"empty", false), instance);
+			const std::string rowsText = ToNarrow(stateNode.GetStringAttr(L"rows", L""));
+			state.region = ParseRowRange(rowsText);
+			state.canBlend = ParseBool(ToNarrow(stateNode.GetStringAttr(L"blend", L"")), true);
+
+			AddStateChecked(outLayer, layerRoleName, isBaseLayer, state,
+				stateNode.GetBoolAttr(L"empty", false), !rowsText.empty(), instance);
 		}
 
-		CheckOrCrash(!outLayer.stateMachine.IsEmpty(), "layer '" + outLayer.name + "' has no states");
+		CheckOrCrash(!outLayer.stateMachine.IsEmpty(), "layer '" + std::string(layerRoleName) + "' has no states");
 
 		return ToNarrow(statesNode.GetStringAttr(L"entry", L""));
 	}
 
 	// <Transitions> 를 읽어 상태 머신에 채운다.
-	void LoadXmlTransitions(XmlNode& layerNode, AnimLayer& outLayer, const AnimInstance& instance)
+	void LoadXmlTransitions(
+		XmlNode& layerNode,
+		AnimLayer& outLayer,
+		const char* layerRoleName,
+		const AnimInstance& instance)
 	{
 		XmlNode transitionsNode = layerNode.FindChild(L"Transitions");
 
@@ -264,8 +300,28 @@ namespace
 				AddConditionChecked(ToNarrow(conditionNode.GetStringAttr(L"test", L"")), instance, transition);
 			}
 
-			AddTransitionChecked(outLayer, transition);
+			AddTransitionChecked(outLayer, layerRoleName, transition);
 		}
+	}
+
+	// <Layer name="Base"|"Overlay"> 하나를 읽어 해당 AnimLayer를 채운다.
+	void LoadXmlLayer(XmlNode& layerNode, AnimLayer& outLayer, const char* layerRoleName,
+		bool isBaseLayer, AnimInstance& outInstance)
+	{
+		const std::string entryStateName =
+			LoadXmlStates(layerNode, outLayer, layerRoleName, isBaseLayer, outInstance);
+
+		LoadXmlTransitions(layerNode, outLayer, layerRoleName, outInstance);
+
+		// entry를 생략하면 첫 번째 상태부터 시작한다(AnimStateMachine::AddState가 처리).
+		if (entryStateName.empty())
+		{
+			return;
+		}
+
+		const bool hasEntryState = outLayer.stateMachine.SetEntryState(entryStateName);
+		CheckOrCrash(hasEntryState,
+			"entry state '" + entryStateName + "' not found in layer '" + layerRoleName + "'");
 	}
 }
 
@@ -296,32 +352,37 @@ int AnimStateMachineLoader::LoadXmlIntoInstance(const WCHAR* path, AnimInstance&
 	// 조건 검증이 파라미터 선언에 기대므로 파라미터를 먼저 읽는다.
 	LoadXmlParameters(root, outInstance);
 
+	// 레이어는 정확히 "Base" 1개(필수) + "Overlay" 0~1개만 허용한다.
+	bool hasBase = false;
+	bool hasOverlay = false;
 	int loadedLayerCount = 0;
 
 	for (XmlNode& layerNode : root.FindChildren(L"Layer"))
 	{
 		const std::string name = ToNarrow(layerNode.GetStringAttr(L"name", L""));
 
-		CheckOrCrash(!name.empty(), "<Layer> has no name attribute");
+		CheckOrCrash(name == "Base" || name == "Overlay",
+			"<Layer name=\"" + name + "\"> is not allowed - only \"Base\" and \"Overlay\" exist");
 
-		const AnimLayerMask mask = ParseRowRange(ToNarrow(layerNode.GetStringAttr(L"rows", L"all")));
-		const AnimBlendMode blendMode = ParseBlendMode(ToNarrow(layerNode.GetStringAttr(L"blend", L"")));
-
-		AnimLayer& layer = outInstance.AddLayer(name, mask, blendMode);
-
-		const std::string entryStateName = LoadXmlStates(layerNode, layer, outInstance);
-
-		LoadXmlTransitions(layerNode, layer, outInstance);
-
-		// entry를 생략하면 첫 번째 상태부터 시작한다(AnimStateMachine::AddState가 처리).
-		if (!entryStateName.empty())
+		if (name == "Base")
 		{
-			const bool hasEntryState = layer.stateMachine.SetEntryState(entryStateName);
-			CheckOrCrash(hasEntryState, "entry state '" + entryStateName + "' not found in layer '" + name + "'");
+			CheckOrCrash(!hasBase, "more than one <Layer name=\"Base\">");
+			hasBase = true;
+
+			LoadXmlLayer(layerNode, outInstance.GetBaseLayer(), "Base", true, outInstance);
+		}
+		else
+		{
+			CheckOrCrash(!hasOverlay, "more than one <Layer name=\"Overlay\">");
+			hasOverlay = true;
+
+			LoadXmlLayer(layerNode, outInstance.GetOverlayLayer(), "Overlay", false, outInstance);
 		}
 
 		++loadedLayerCount;
 	}
+
+	CheckOrCrash(hasBase, "<AnimStateMachine> has no <Layer name=\"Base\">");
 
 	return loadedLayerCount;
 }
@@ -372,18 +433,22 @@ namespace
 		std::string clipName;
 		bool hasEntryTag = false;
 		bool hasEmptyTag = false;
+
+		// Overlay 전용. rows 태그를 실제로 썼는지 - Base에 잘못 붙였는지 검증할 때 쓴다.
+		bool hasRowsTag = false;
+		AnimLayerMask region;
+		bool canBlend = true;
 	};
 
-	// 캔버스에서 만들어질 레이어 하나.
+	// 캔버스에서 만들어질 레이어 하나. Base 또는 Overlay 둘 중 하나에 대응한다.
 	struct CanvasLayer
 	{
-		std::string name;
-		int order = 0;
-		AnimLayerMask mask;
-		AnimBlendMode blendMode = AnimBlendMode::Replace;
-		const CanvasNode* group = nullptr;   // nullptr이면 그룹 없는 기본 레이어
-		AnimLayer* layer = nullptr;          // AddLayer 후에 채워짐
+		bool isBase = false;
+		const CanvasNode* group = nullptr;   // nullptr이면 그룹 없는 기본 레이어(=Base로 간주)
+		AnimLayer* layer = nullptr;          // GetBaseLayer()/GetOverlayLayer() 결과
 		std::string entryStateName;
+
+		const char* RoleName() const { return isBase ? "Base" : "Overlay"; }
 	};
 
 	// 캔버스에서 만들어질 전이 하나.
@@ -441,7 +506,7 @@ namespace
 		return lines;
 	}
 
-	// "Idle [entry] [empty]" 에서 대괄호 안의 태그들을 뽑고, 앞쪽 본문을 반환한다.
+	// "Idle [entry] [rows=4-7]" 에서 대괄호 안의 태그들을 뽑고, 앞쪽 본문을 반환한다.
 	std::string ExtractTags(const std::string& text, OUT std::vector<std::string>& outTags)
 	{
 		std::string head;
@@ -506,7 +571,7 @@ namespace
 	}
 
 	// 노드 본문을 파싱한다.
-	//   # Idle [entry]
+	//   # Idle [entry] [rows=4-7] [blend=false]
 	//   clip: Idle
 	CanvasNodeText ParseNodeText(const std::string& text)
 	{
@@ -524,7 +589,12 @@ namespace
 		parsed.hasEntryTag = HasTag(tags, "entry");
 		parsed.hasEmptyTag = HasTag(tags, "empty");
 
-		// 이후 줄은 "키: 값".
+		const std::string rowsTag = FindTagValue(tags, "rows");
+		parsed.hasRowsTag = !rowsTag.empty();
+		parsed.region = ParseRowRange(rowsTag);
+		parsed.canBlend = ParseBool(FindTagValue(tags, "blend"), true);
+
+		// 이후 줄은 "키: 값". 지금은 clip: 만 쓴다.
 		for (size_t index = 1; index < lines.size(); ++index)
 		{
 			const size_t colonPos = lines[index].find(':');
@@ -695,54 +765,66 @@ int AnimStateMachineLoader::LoadCanvasIntoInstance(const WCHAR* path, AnimInstan
 	}
 
 	// -----------------------------------------------------------------------
-	// 3) 그룹을 레이어로 만든다. [layer=N] 순서가 곧 합성 순서다.
+	// 3) 그룹을 레이어로 만든다.
+	//    그룹 0개 - 전체를 Base 하나로. 1개 - 반드시 "Base". 2개 - 반드시 "Base"+"Overlay".
+	//    예전의 [layer=N] 정렬/충돌 검사는 이름 검증으로 대체된다.
 	// -----------------------------------------------------------------------
 	std::vector<CanvasLayer> canvasLayers;
 
 	if (groupNodes.empty())
 	{
-		// 그룹이 없는 캔버스는 전체를 레이어 하나로 본다.
-		CanvasLayer single;
-		single.name = "Base";
-		single.order = 0;
-		canvasLayers.emplace_back(single);
+		CanvasLayer base;
+		base.isBase = true;
+		base.layer = &outInstance.GetBaseLayer();
+		canvasLayers.emplace_back(base);
 	}
 	else
 	{
+		CheckOrCrash(groupNodes.size() <= 2,
+			"canvas has " + std::to_string(groupNodes.size())
+			+ " layer groups; only \"Base\" and \"Overlay\" are allowed");
+
+		const CanvasNode* baseGroup = nullptr;
+		const CanvasNode* overlayGroup = nullptr;
+
 		for (const CanvasNode& group : groupNodes)
 		{
 			std::vector<std::string> tags;
+			const std::string groupName = ExtractTags(group.label, tags);
 
-			CanvasLayer canvasLayer;
-			canvasLayer.name = ExtractTags(group.label, tags);
-			canvasLayer.group = &group;
-
-			CheckOrCrash(!canvasLayer.name.empty(), "group has no name in its label: '" + group.label + "'");
-
-			const std::string orderText = FindTagValue(tags, "layer");
-			canvasLayer.order = orderText.empty() ? 0 : ::atoi(orderText.c_str());
-			canvasLayer.mask = ParseRowRange(FindTagValue(tags, "rows"));
-			canvasLayer.blendMode = ParseBlendMode(FindTagValue(tags, "blend"));
-
-			canvasLayers.emplace_back(canvasLayer);
+			if (groupName == "Base")
+			{
+				CheckOrCrash(nullptr == baseGroup, "more than one group named \"Base\"");
+				baseGroup = &group;
+			}
+			else if (groupName == "Overlay")
+			{
+				CheckOrCrash(nullptr == overlayGroup, "more than one group named \"Overlay\"");
+				overlayGroup = &group;
+			}
+			else
+			{
+				CheckOrCrash(false, "layer group named '" + groupName
+					+ "' is not allowed - only \"Base\" and \"Overlay\" exist");
+			}
 		}
 
-		// Obsidian이 배열 순서를 뒤섞으므로 [layer=N]으로만 순서를 정한다.
-		std::stable_sort(canvasLayers.begin(), canvasLayers.end(),
-			[](const CanvasLayer& left, const CanvasLayer& right) { return left.order < right.order; });
+		CheckOrCrash(nullptr != baseGroup, "canvas has layer groups but none is named \"Base\"");
 
-		for (size_t index = 1; index < canvasLayers.size(); ++index)
+		CanvasLayer base;
+		base.isBase = true;
+		base.group = baseGroup;
+		base.layer = &outInstance.GetBaseLayer();
+		canvasLayers.emplace_back(base);
+
+		if (nullptr != overlayGroup)
 		{
-			CheckOrCrash(canvasLayers[index - 1].order != canvasLayers[index].order,
-				"two layers share [layer=" + std::to_string(canvasLayers[index].order)
-				+ "] so their composite order is ambiguous: '"
-				+ canvasLayers[index - 1].name + "' and '" + canvasLayers[index].name + "'");
+			CanvasLayer overlay;
+			overlay.isBase = false;
+			overlay.group = overlayGroup;
+			overlay.layer = &outInstance.GetOverlayLayer();
+			canvasLayers.emplace_back(overlay);
 		}
-	}
-
-	for (CanvasLayer& canvasLayer : canvasLayers)
-	{
-		canvasLayer.layer = &outInstance.AddLayer(canvasLayer.name, canvasLayer.mask, canvasLayer.blendMode);
 	}
 
 	// -----------------------------------------------------------------------
@@ -840,8 +922,11 @@ int AnimStateMachineLoader::LoadCanvasIntoInstance(const WCHAR* path, AnimInstan
 			AnimState state;
 			state.name = parsed.name;
 			state.clipName = parsed.clipName;
+			state.region = parsed.region;
+			state.canBlend = parsed.canBlend;
 
-			AddStateChecked(*canvasLayer.layer, state, parsed.hasEmptyTag, outInstance);
+			AddStateChecked(*canvasLayer.layer, canvasLayer.RoleName(), canvasLayer.isBase,
+				state, parsed.hasEmptyTag, parsed.hasRowsTag, outInstance);
 
 			if (!parsed.hasEntryTag)
 			{
@@ -849,14 +934,14 @@ int AnimStateMachineLoader::LoadCanvasIntoInstance(const WCHAR* path, AnimInstan
 			}
 
 			CheckOrCrash(canvasLayer.entryStateName.empty(),
-				"layer '" + canvasLayer.name + "' has more than one [entry] node ('"
+				"layer '" + std::string(canvasLayer.RoleName()) + "' has more than one [entry] node ('"
 				+ canvasLayer.entryStateName + "' and '" + parsed.name + "')");
 
 			canvasLayer.entryStateName = parsed.name;
 		}
 
 		CheckOrCrash(!canvasLayer.layer->stateMachine.IsEmpty(),
-			"layer '" + canvasLayer.name + "' has no states");
+			"layer '" + std::string(canvasLayer.RoleName()) + "' has no states");
 	}
 
 	// -----------------------------------------------------------------------
@@ -948,7 +1033,9 @@ int AnimStateMachineLoader::LoadCanvasIntoInstance(const WCHAR* path, AnimInstan
 
 	for (const CanvasTransition& canvasTransition : canvasTransitions)
 	{
-		AddTransitionChecked(*canvasLayers[canvasTransition.layerIndex].layer, canvasTransition.transition);
+		CanvasLayer& target = canvasLayers[canvasTransition.layerIndex];
+
+		AddTransitionChecked(*target.layer, target.RoleName(), canvasTransition.transition);
 	}
 
 	// -----------------------------------------------------------------------
@@ -964,7 +1051,8 @@ int AnimStateMachineLoader::LoadCanvasIntoInstance(const WCHAR* path, AnimInstan
 
 		const bool hasEntryState = canvasLayer.layer->stateMachine.SetEntryState(canvasLayer.entryStateName);
 		CheckOrCrash(hasEntryState,
-			"entry state '" + canvasLayer.entryStateName + "' not found in layer '" + canvasLayer.name + "'");
+			"entry state '" + canvasLayer.entryStateName + "' not found in layer '"
+			+ canvasLayer.RoleName() + "'");
 	}
 
 	return static_cast<int>(canvasLayers.size());
