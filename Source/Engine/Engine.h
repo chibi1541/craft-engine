@@ -4,6 +4,7 @@ NAME_SPACE_BEGIN(Craft)
 
 class Level;
 class Input;
+class InputSystem;
 class Renderer;
 class AssetManager;
 
@@ -65,6 +66,12 @@ protected:
 	// 입력 처리(폴링 방식 vs 이벤트)
 	void ProcessInput();
 
+	// 이번 프레임의 입력을 이벤트로 만들어 InputComponent들에게 전달.
+	//
+	// BeginPlay 뒤에 두는 이유 - 이번 프레임에 등록된 컴포넌트도 바로 입력을 받는다.
+	// Tick 앞에 두는 이유 - 콜백이 세운 값을 같은 프레임의 Tick이 읽는다(한 프레임도 안 밀림).
+	void DispatchInput();
+
 	// 초기화 함수.
 	void OnInitialized();
 
@@ -108,6 +115,10 @@ protected:
 
 	// 입력 시스템 변수
 	std::unique_ptr<Input> input;
+
+	// 입력 이벤트를 InputComponent들에게 전달하는 디스패처.
+	// Input의 상태를 읽으므로 input보다 나중에 만들고 먼저 정리한다.
+	std::unique_ptr<InputSystem> inputSystem;
 
 	std::unique_ptr<Renderer> renderer;
 

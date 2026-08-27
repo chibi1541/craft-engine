@@ -10,29 +10,46 @@ namespace Craft
 		// Engine 클래스 friend 선언.
 		friend class Engine;
 
+		// 관리할 가상 키의 수.
+		// keyStates 배열 크기와 한 곳에서 묶어두기 위해 enum으로 선언.
+		enum { KeyCount = 256, };
+
 		// 키 입력 상태를 저장하기 위한 구조체.
+		//
+		// 이전 프레임 상태를 들고 비교하는 방식이 아니라, 이번 프레임에
+		// "전이가 있었는지"를 직접 기록한다.
+		// ProcessInput이 콘솔 입력 버퍼를 통째로 드레인하기 때문에 한 프레임 안에서
+		// 눌렀다 뗀 입력은 isKeyDown이 false로 끝나고, 이전 프레임 비교 방식으로는
+		// 눌린 사실 자체가 사라진다(짧게 톡 친 입력이 씹힘).
 		struct KeyState
 		{
-			// 현재 프레임에 키가 눌렸는지 여부.
+			// 현재 실제 눌림 상태.
 			bool isKeyDown = false;
 
-			// 이전 프레임에 키가 눌렸는지 여부.
-			bool wasKeyDown = false;
+			// 이번 프레임에 눌림 전이가 발생했는지 여부.
+			// SavePreviousStates에서 지워지는 프레임 단위 플래그.
+			bool pressedThisFrame = false;
+
+			// 이번 프레임에 뗌 전이가 발생했는지 여부.
+			bool releasedThisFrame = false;
 		};
 
 	public:
 		Input();
 		~Input();
 
-		// 키 눌림/해제 여부 확인 함수.
-		// 이전 프레임에 안 눌렸다가 이번 프레임에 눌리면 true 반환.
+		// 이번 프레임에 눌리기 시작했으면 true 반환.
 		bool GetKeyDown(int keyCode) const;
 
-		// 이전 프레임에 눌렸다가 이번 프레임에 안 눌리면 true 반환.
+		// 이번 프레임에 떼졌으면 true 반환.
 		bool GetKeyUp(int keyCode) const;
 
-		// 현재 프레임에 입력이 눌리면 반복해서 true를 반환하는 함수.
+		// 눌려 있는 동안 매 프레임 true 반환.
 		bool GetKey(int keyCode) const;
+
+		// 이번 프레임에 이 키와 관련된 일이 하나라도 있었는지 여부.
+		// InputSystem이 256개 키를 순회할 때 빠르게 건너뛰기 위한 함수.
+		bool HasKeyActivity(int keyCode) const;
 
 		// 현재 마우스 포인터의 콘솔 셀 좌표를 반환.
 		const Vector2& GetMousePosition() const { return mousePosition; }
@@ -44,16 +61,21 @@ namespace Craft
 		// 현재 프레임에 특정 키 입력이 발생했는지를 처리하는 함수.
 		void ProcessInput();
 
-		// 이전 프레임의 키 눌림 상태를 저장하는 함수.
+		// 프레임 단위 전이 플래그를 정리하는 함수.
+		// 프레임의 끝에서 호출되어 다음 프레임의 경계를 만든다.
 		void SavePreviousStates();
 
+		// 키 하나의 눌림 상태를 갱신하면서 전이를 기록하는 함수.
+		//
+		// 콘솔은 키를 누르고 있으면 자동 반복(typematic)으로 같은 눌림 이벤트를
+		// 계속 보내고, 마우스는 커서를 움직이기만 해도 버튼 상태를 다시 보낸다.
+		// 그래서 상태가 실제로 바뀐 순간에만 플래그를 세워야
+		// Pressed 이벤트가 매 프레임 연사되지 않는다.
+		void UpdateKeyState(int keyCode, bool isKeyDown);
+
 	private:
-
-		// 가상 키의 수 (=처리할 키의 수).
-		const int keyCount = 256;
-
 		// 키 상태를 관리할 배열.
-		KeyState keyStates[256] = { };
+		KeyState keyStates[KeyCount] = { };
 
 		// 콘솔 입력 이벤트를 읽기 위한 핸들.
 		HANDLE inputHandle = INVALID_HANDLE_VALUE;

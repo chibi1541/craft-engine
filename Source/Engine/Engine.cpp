@@ -2,6 +2,7 @@
 #include "Engine.h"
 #include "Level/Level.h"
 #include "Input/Input.h"
+#include "Input/InputSystem.h"
 #include "Render/Renderer.h"
 #include "Math/Palette.h"
 #include "Asset/AssetManager.h"
@@ -29,6 +30,10 @@ Engine::Engine()
 
 	// 입력 객체 생성
 	input = std::make_unique<Input>();
+
+	// 입력 디스패처 생성.
+	// 디스패치할 때 Input의 상태를 읽으므로 반드시 input 다음에 만든다.
+	inputSystem = std::make_unique<InputSystem>();
 
 	// 랜더러 객체 생성
 	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
@@ -72,10 +77,6 @@ void Engine::Run()
 			break;
 		}
 
-		// 프레임 처리
-		// 1. 입력 처리
-		ProcessInput();
-
 		// 프레임 시간 계산
 		QueryPerformanceCounter(&counter);
 		current = counter.QuadPart;
@@ -84,6 +85,14 @@ void Engine::Run()
 		// 고정 프레임
 		if (deltaTime >= oneFrameTime)
 		{
+			// 1. 입력 처리.
+			//
+			// 반드시 프레임 게이트 안에서 호출해야 한다.
+			// 밖에 두면 대기하는 동안 콘솔 입력 버퍼를 수백 번 드레인하게 되어
+			// 프레임 단위 전이 플래그가 실제 프레임 경계와 어긋난다.
+			// 대기 중에는 콘솔 입력 버퍼가 이벤트를 대신 보관하므로 유실되지 않는다.
+			ProcessInput();
+
 			// 프레임 수 측정
 			UpdateFps(deltaTime);
 
@@ -92,6 +101,10 @@ void Engine::Run()
 
 			// 아마 플레그를 둬서 한번만 처리하는 방식으로 구현하겠지...
 			BeginPlay();
+
+			// 3. 입력 이벤트 전달.
+			// BeginPlay에서 막 등록된 InputComponent도 이번 프레임부터 입력을 받는다.
+			DispatchInput();
 
 			Tick(deltaTime);
 
@@ -175,6 +188,17 @@ void Engine::ProcessInput()
 	}
 
 	input->ProcessInput();
+}
+
+void Engine::DispatchInput()
+{
+	ASSERT_CRASH(inputSystem != nullptr);
+	if (inputSystem == nullptr)
+	{
+		return;
+	}
+
+	inputSystem->DispatchInput();
 }
 
 void Engine::OnInitialized()

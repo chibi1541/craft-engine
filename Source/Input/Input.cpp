@@ -55,28 +55,60 @@ namespace Craft
 
 	bool Input::GetKeyDown(int keyCode) const
 	{
-		return !keyStates[keyCode].wasKeyDown
-			&& keyStates[keyCode].isKeyDown;
+		return keyStates[keyCode].pressedThisFrame;
 	}
-	
+
 	bool Input::GetKeyUp(int keyCode) const
 	{
-		return keyStates[keyCode].wasKeyDown
-			&& !keyStates[keyCode].isKeyDown;
+		return keyStates[keyCode].releasedThisFrame;
 	}
-	
+
 	bool Input::GetKey(int keyCode) const
 	{
 		return keyStates[keyCode].isKeyDown;
 	}
-	
+
+	bool Input::HasKeyActivity(int keyCode) const
+	{
+		const KeyState& state = keyStates[keyCode];
+
+		return state.isKeyDown
+			|| state.pressedThisFrame
+			|| state.releasedThisFrame;
+	}
+
 	Input& Input::Get()
 	{
 		// 여기에서 instance는 null이면 안됨.
 		assert(instance && "instance should not be null here");
 		return *instance;
 	}
-	
+
+	void Input::UpdateKeyState(int keyCode, bool isKeyDown)
+	{
+		KeyState& state = keyStates[keyCode];
+
+		// 상태가 그대로면 전이가 아니므로 아무것도 기록하지 않는다.
+		// 자동 반복 이벤트와 마우스 이동 이벤트가 여기서 걸러진다.
+		if (state.isKeyDown == isKeyDown)
+		{
+			return;
+		}
+
+		// 실제로 바뀐 순간에만 전이를 기록.
+		// 한 프레임 안에서 눌렀다 떼면 두 플래그가 모두 켜진 채로 남는다.
+		if (isKeyDown)
+		{
+			state.pressedThisFrame = true;
+		}
+		else
+		{
+			state.releasedThisFrame = true;
+		}
+
+		state.isKeyDown = isKeyDown;
+	}
+
 	void Input::ProcessInput()
 	{
 		// 콘솔 입력 핸들이 유효하지 않으면 입력 처리 종료.
@@ -125,12 +157,10 @@ namespace Craft
 					const WORD keyCode = keyEvent.wVirtualKeyCode;
 
 					// 관리하는 키 배열 범위 안에 있는지 확인.
-					if (keyCode < keyCount)
+					if (keyCode < KeyCount)
 					{
 						// 키가 눌렸는지 또는 해제됐는지 현재 상태에 저장.
-						KeyState& state = keyStates[keyCode];
-						const bool isKeyDown = keyEvent.bKeyDown != FALSE;
-						state.isKeyDown = isKeyDown;
+						UpdateKeyState(keyCode, keyEvent.bKeyDown != FALSE);
 					}
 					break;
 				}
@@ -159,13 +189,16 @@ namespace Craft
 					};
 
 					// 왼쪽, 오른쪽, 가운데 마우스 버튼 상태 처리.
+					//
+					// 마우스 이벤트는 커서를 움직이기만 해도 발생하고 그때마다
+					// 눌려 있는 버튼 상태가 그대로 다시 실려 온다.
+					// UpdateKeyState가 전이만 기록하므로 Pressed가 중복되지 않고,
+					// 이벤트가 더 안 와도 눌린 상태는 그대로 유지된다.
 					for (const MouseButton& button : mouseButtons)
 					{
 						// 버튼이 눌렸는지 비트 연산으로 확인한 후 키 상태에 저장.
-						KeyState& state = keyStates[button.keyCode];
-						const bool isKeyDown =
-							(mouseEvent.dwButtonState & button.buttonMask) != 0;
-						state.isKeyDown = isKeyDown;
+						UpdateKeyState(button.keyCode,
+							(mouseEvent.dwButtonState & button.buttonMask) != 0);
 					}
 					break;
 				}
@@ -176,9 +209,13 @@ namespace Craft
 					{
 						// 포커스를 잃는 동안 KeyUp 이벤트가 누락되어
 						// 키가 계속 눌린 상태로 남는 것을 방지.
-						for (KeyState& state : keyStates)
+						//
+						// 그냥 isKeyDown만 지우면 뗌 전이가 기록되지 않아서
+						// InputSystem의 키 소유권(래치)이 영원히 안 풀린다.
+						// UpdateKeyState로 지워야 Released 이벤트까지 정상 발생한다.
+						for (int keyCode = 0; keyCode < KeyCount; ++keyCode)
 						{
-							state.isKeyDown = false;
+							UpdateKeyState(keyCode, false);
 						}
 					}
 					break;
@@ -186,14 +223,15 @@ namespace Craft
 			}
 		}
 	}
-	
+
 	void Input::SavePreviousStates()
 	{
-		// 이전 프레임 입력 값 저장.
+		// 프레임 단위 전이 플래그 정리.
+		// 여기가 프레임의 경계다. isKeyDown은 실제 상태이므로 건드리지 않는다.
 		for (KeyState& state : keyStates)
 		{
-			// 현재 프레임 입력 값을 이전 프레임 값으로 저장.
-			state.wasKeyDown = state.isKeyDown;
+			state.pressedThisFrame = false;
+			state.releasedThisFrame = false;
 		}
 	}
 }
