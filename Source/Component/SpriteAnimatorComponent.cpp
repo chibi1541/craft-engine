@@ -2,6 +2,7 @@
 #include "SpriteAnimatorComponent.h"
 #include "Asset/SpriteAnimationLoader.h"
 #include "Asset/AnimStateMachineLoader.h"
+#include "Asset/AssetManager.h"
 #include "Actor/Actor.h"
 #include "Render/Renderer.h"
 
@@ -55,15 +56,16 @@ void SpriteAnimatorComponent::Draw()
 
 int SpriteAnimatorComponent::LoadClipsFromFile(const WCHAR* path)
 {
-	const std::vector<std::shared_ptr<const AnimationClip>> loadedClips =
-		SpriteAnimationLoader::LoadFromFile(path);
+	// 캐시 히트면 파싱 없이 즉시 반환된다. 같은 파일을 쓰는 액터가 여럿이어도
+	// XML은 처음 한 번만 파싱된다.
+	loadedClips = AssetManager::Get().Load<AnimationClipSet>(path);
 
-	for (const std::shared_ptr<const AnimationClip>& clip : loadedClips)
+	for (const std::shared_ptr<const AnimationClip>& clip : *loadedClips)
 	{
 		animInstance.AddClip(clip);
 	}
 
-	return static_cast<int>(loadedClips.size());
+	return static_cast<int>(loadedClips->size());
 }
 
 int SpriteAnimatorComponent::LoadStateMachineFromFile(const WCHAR* path)

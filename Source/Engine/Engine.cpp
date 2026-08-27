@@ -4,6 +4,9 @@
 #include "Input/Input.h"
 #include "Render/Renderer.h"
 #include "Math/Palette.h"
+#include "Asset/AssetManager.h"
+#include "Asset/AssetTypes.h"
+#include "Asset/SpriteAnimationLoader.h"
 
 #include <memory>
 
@@ -30,6 +33,13 @@ Engine::Engine()
 	// 랜더러 객체 생성
 	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
 
+	// 애셋 매니저 생성 + 타입별 로더 등록.
+	assetManager = std::make_unique<AssetManager>();
+	assetManager->RegisterLoader<AnimationClipSet>(
+		[](const WCHAR* path)
+		{
+			return std::make_shared<const AnimationClipSet>(SpriteAnimationLoader::LoadFromFile(path));
+		});
 }
 
 Engine::~Engine()
@@ -194,6 +204,12 @@ void Engine::BeginPlay()
 
 void Engine::Tick(float deltaTime)
 {
+	// 레벨 유무와 무관하게 애셋 유휴 정리는 항상 돈다.
+	if (assetManager)
+	{
+		assetManager->Tick(deltaTime);
+	}
+
 	// 상용 엔진의 경우 code style은 얼리 아웃의 경우가 많음
 	if (!mainLevel)
 	{

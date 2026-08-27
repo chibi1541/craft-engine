@@ -6,6 +6,7 @@
 #include "Animation/AnimInstance.h"
 #include "Math/Vector2.h"
 #include "Math/SymbolPalette.h"
+#include "Asset/AssetTypes.h"
 #include <string>
 #include <memory>
 
@@ -92,6 +93,11 @@ public:
 private:
 	// 파라미터 + 레이어 + 상태 머신 + 합성을 전부 들고 있는 애니메이션의 주체.
 	AnimInstance animInstance;
+
+	// AssetManager::Load<AnimationClipSet>()이 돌려준 캐시 항목을 붙들고 있는 용도.
+	// 클립은 개별적으로 animInstance에 등록해서 쓰지만, 이 참조가 살아있어야
+	// AssetManager 캐시의 refcount가 "사용 중"으로 잡혀서 유휴 언로드 대상이 안 된다.
+	std::shared_ptr<const AnimationClipSet> loadedClips;
 
 	Vector2 offset = Vector2::Zero;
 

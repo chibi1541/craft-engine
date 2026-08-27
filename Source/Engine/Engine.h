@@ -5,6 +5,7 @@ NAME_SPACE_BEGIN(Craft)
 class Level;
 class Input;
 class Renderer;
+class AssetManager;
 
 
 // dll에서 외부 모듈로 노출시키겠다는 키워드
@@ -107,6 +108,9 @@ protected:
 	std::unique_ptr<Input> input;
 
 	std::unique_ptr<Renderer> renderer;
+
+	// 애셋 로드/캐싱/유휴 언로드를 담당
+	std::unique_ptr<AssetManager> assetManager;
 
 	// 화면에 프레임 수를 표시할지 여부
 	bool showFps = true;
