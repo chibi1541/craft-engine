@@ -1,6 +1,8 @@
 ﻿#pragma once
 
 #include "Utils/EngineMacro.h"
+#include "Core/CraftObject.h"
+#include "Asset/PrimaryDataAsset.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -124,6 +126,40 @@ public:
 	inline void SetUnloadThreshold(float seconds) { unloadThreshold = seconds; }
 	inline float GetUnloadThreshold() const { return unloadThreshold; }
 
+	// --- Primary Data Asset -----------------------------------------------
+	// 매니페스트로 한꺼번에 로드되고, 이름으로 조회되고, 유휴 언로드되지 않는 애셋.
+	// 자세한 설명은 PrimaryDataAsset.h 참고.
+
+	// 파생 타입 T를 문자열 typeName으로 등록한다. 매니페스트의 type="..."이 이 이름과 매칭된다.
+	// LoadPrimaryAssetManifest()보다 먼저 호출해야 한다.
+	template<typename T>
+	void RegisterPrimaryAssetType(const std::string& typeName)
+	{
+		primaryAssetFactories[typeName] = []() { return std::make_shared<T>(); };
+	}
+
+	// 매니페스트 XML을 읽어 <Asset type=".." name=".." path=".."> 항목을 전부 로드한다.
+	// 관련 RegisterPrimaryAssetType() 호출들이 모두 끝난 뒤, 다른 애셋을 쓰기 전에 호출할 것.
+	// Primary 애셋은 없으면 게임이 못 뜨는 필수 데이터라, 실패 시 크래시한다
+	// (Palette/AnimationClip처럼 조용히 기본값으로 폴백하지 않음).
+	// 로드된 개수를 반환한다.
+	int LoadPrimaryAssetManifest(const WCHAR* manifestPath);
+
+	// 이름으로 조회한다. 등록 안 된 이름이거나 타입이 안 맞으면 nullptr.
+	template<typename T>
+	std::shared_ptr<const T> GetPrimaryAsset(const std::string& name) const
+	{
+		auto it = primaryAssets.find(name);
+
+		if (it == primaryAssets.end())
+		{
+			return nullptr;
+		}
+
+		// Cast<T>가 shared_ptr<T>를 돌려주고, 이게 shared_ptr<const T>로 암묵 변환된다.
+		return Cast<T>(it->second);
+	}
+
 private:
 	// 템플릿 멤버 함수라 정의를 여기(헤더)에 둬야 함 - cpp로 분리 불가.
 	template<typename T>
@@ -148,6 +184,13 @@ private:
 	std::unordered_map<std::type_index, std::unique_ptr<TypedCacheBase>> caches;
 
 	float unloadThreshold = 30.0f;
+
+	// 문자열 타입 이름 -> 빈 인스턴스를 만드는 팩토리.
+	std::unordered_map<std::string, std::function<std::shared_ptr<PrimaryDataAsset>()>> primaryAssetFactories;
+
+	// 이름 -> 로드 완료된 프라이머리 애셋.
+	// caches(TypedCache)와 완전히 분리된 별도 저장소라서 Tick()의 유휴 정리 대상이 아니다.
+	std::unordered_map<std::string, std::shared_ptr<PrimaryDataAsset>> primaryAssets;
 
 	static AssetManager* instance;
 };

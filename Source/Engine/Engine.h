@@ -59,6 +59,8 @@ public:
 
 	std::shared_ptr<Level> GetLevel();
 
+	AssetManager* GetAssetManager() const { return assetManager.get(); }
+
 protected:
 	// 입력 처리(폴링 방식 vs 이벤트)
 	void ProcessInput();
