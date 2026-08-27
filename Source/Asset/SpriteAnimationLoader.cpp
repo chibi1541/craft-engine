@@ -30,6 +30,34 @@ namespace
 
 		return true;
 	}
+
+	// <Clip> 안의 <Notify>들을 읽어 클립에 등록한다.
+	// <Frame>과 태그 이름이 달라서 FindChildren이 알아서 구분한다.
+	void LoadNotifies(XmlNode& clipNode, AnimationClip& outClip)
+	{
+		for (XmlNode& notifyNode : clipNode.FindChildren(L"Notify"))
+		{
+			AnimNotify notify;
+			notify.name = FileUtils::Convert(notifyNode.GetStringAttr(L"name", L""));
+
+			const std::string frameText = FileUtils::Convert(notifyNode.GetStringAttr(L"frame", L""));
+
+			// frame="end"는 프레임이 아니라 "논루프 클립이 끝난 순간"을 뜻한다.
+			// 마지막 프레임 노티파이는 그 장에 "들어갈 때" 울려서 한 프레임 빠르다.
+			if (frameText == "end")
+			{
+				notify.fireOnFinish = true;
+			}
+			else
+			{
+				// frame을 아예 안 적으면 0번으로 본다(atoi("")가 0).
+				notify.frameIndex = ::atoi(frameText.c_str());
+			}
+
+			// 이름 없음 / 범위 밖 프레임 / 루프 클립에 end 같은 실수는 AddNotify가 잡는다.
+			outClip.AddNotify(notify);
+		}
+	}
 }
 
 // TODO : AssetManager 쪽으로 기능 이전
@@ -119,23 +147,32 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 		// pivot="x,y". 생략하면 프레임 크기에서 가운데 맨 아래(발밑)로 정해진다.
 		const std::string pivotText = FileUtils::Convert(clipNode.GetStringAttr(L"pivot", L""));
 
+		// 노티파이를 넣어야 하므로 일단 비-const로 만든다.
+		// 아래에서 shared_ptr<const AnimationClip>로 넘기면(암시 변환) 밖에서는 변경할 수 없다.
+		std::shared_ptr<AnimationClip> clip;
+
 		if (pivotText.empty())
 		{
-			clips.emplace_back(std::make_shared<const AnimationClip>(name, frames, framesPerSecond, isLooping));
+			clip = std::make_shared<AnimationClip>(name, frames, framesPerSecond, isLooping);
+		}
+		else
+		{
+			float pivotX = 0.0f;
+			float pivotY = 0.0f;
 
-			continue;
+			const bool hasParsedPivot = ParsePivot(pivotText, pivotX, pivotY);
+
+			// 형식이 틀린 피벗을 0,0으로 넘겨버리면 캐릭터가 엉뚱한 곳에 붙는다.
+			ASSERT_CRASH(hasParsedPivot);
+
+			clip = std::make_shared<AnimationClip>(
+				name, frames, framesPerSecond, isLooping, pivotX, pivotY);
 		}
 
-		float pivotX = 0.0f;
-		float pivotY = 0.0f;
+		// 노티파이는 클립을 만든 뒤에 넣는다 - 프레임 범위 검증에 frameCount가 필요하다.
+		LoadNotifies(clipNode, *clip);
 
-		const bool hasParsedPivot = ParsePivot(pivotText, pivotX, pivotY);
-
-		// 형식이 틀린 피벗을 0,0으로 넘겨버리면 캐릭터가 엉뚱한 곳에 붙는다.
-		ASSERT_CRASH(hasParsedPivot);
-
-		clips.emplace_back(std::make_shared<const AnimationClip>(
-			name, frames, framesPerSecond, isLooping, pivotX, pivotY));
+		clips.emplace_back(clip);
 	}
 
 	return clips;

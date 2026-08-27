@@ -56,6 +56,32 @@ void AnimationClip::ValidateFrames()
 	}
 }
 
+void AnimationClip::AddNotify(const AnimNotify& notify)
+{
+	// 이름 없는 노티파이는 게임플레이가 받아볼 방법이 없다.
+	ASSERT_CRASH(!notify.name.empty());
+
+	if (notify.fireOnFinish)
+	{
+		// 루프 클립은 영영 끝나지 않으므로 이 선언은 죽은 코드가 된다.
+		// 조용히 안 울리는 것보다 로드할 때 잡는 게 낫다.
+		ASSERT_CRASH(!isLooping);
+
+		// AnimationPlayer::Tick이 1장짜리 클립은 얼리 아웃해서 hasFinished를 켜지 않는다.
+		// 그래서 프레임이 1장뿐이면 이 노티파이도 영영 안 울린다.
+		ASSERT_CRASH(GetFrameCount() >= 2);
+
+		notifies.emplace_back(notify);
+
+		return;
+	}
+
+	// 프레임 노티파이는 실제로 존재하는 프레임을 가리켜야 한다.
+	ASSERT_CRASH(notify.frameIndex >= 0 && notify.frameIndex < GetFrameCount());
+
+	notifies.emplace_back(notify);
+}
+
 const Sprite& AnimationClip::GetFrame(int index) const
 {
 	// 예외 처리 - 프레임이 하나도 없는 클립.

@@ -5,6 +5,7 @@
 
 #include "Asset/AnimationClip.h"
 #include <memory>
+#include <vector>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -63,6 +64,26 @@ public:
 		playRate = rate;
 	}
 
+	// --- 프레임 이벤트 ---------------------------------------------------
+	// 재생기는 "무슨 일이 있었는지"만 남긴다. 이름을 붙이고 게임플레이로 보내는 건
+	// AnimInstance의 일이다. 여기까지가 시간/프레임 커서의 책임 범위다.
+
+	// 기록을 비운다. 프레임 경계를 정하는 건 소유자(AnimInstance::TickLayer)다.
+	//
+	// Tick() 안에서 비우지 않는 이유 - TickLayer는 "평가 -> Play -> Tick" 순인데
+	// Play가 클립을 바꾸면 Reset이 "0번 진입"을 기록한다. Tick 맨 앞에서 비우면 그게 지워진다.
+	// 밖에서 명시적으로 비우면 Tick()의 얼리 아웃(1프레임 클립, 이미 끝난 논루프)도 안전하다.
+	void ClearFrameEvents();
+
+	// 이번 틱에 새로 진입한 프레임들. 진입한 순서대로 들어있다.
+	//
+	// 한 틱에 여러 장을 넘길 수 있어서(저프레임/빠른 클립) 목록이다.
+	// 마지막 것만 남기면 저프레임에서 중간 프레임의 판정이 통째로 씹힌다.
+	inline const std::vector<int>& GetFramesEnteredThisTick() const { return framesEnteredThisTick; }
+
+	// 이번 틱에 논루프 클립이 막 끝났는지. (hasFinished가 이번에 켜졌는지)
+	inline bool HasJustFinished() const { return hasJustFinished; }
+
 private:
 	// 재생 중인 클립. 여러 액터가 같은 클립을 공유하므로 const shared_ptr.
 	std::shared_ptr<const AnimationClip> clip;
@@ -75,6 +96,11 @@ private:
 	float playRate = 1.0f;
 
 	bool hasFinished = false;
+
+	// 이번 틱에 진입한 프레임들. ClearFrameEvents로 비우고 Reset/Tick이 채운다.
+	std::vector<int> framesEnteredThisTick;
+
+	bool hasJustFinished = false;
 };
 
 NAME_SPACE_END

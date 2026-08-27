@@ -47,6 +47,11 @@ void AnimationPlayer::Tick(float deltaTime)
 		// 아직 클립 안쪽이면 계속 진행.
 		if (currentFrameIndex < clip->GetFrameCount())
 		{
+			// 건너뛴 프레임을 하나도 빠뜨리지 않고 기록한다.
+			// 저프레임에서 이 루프가 여러 번 도는데, 마지막 것만 남기면
+			// 중간 프레임에 걸린 노티파이(타격 판정 등)가 통째로 씹힌다.
+			framesEnteredThisTick.emplace_back(currentFrameIndex);
+
 			continue;
 		}
 
@@ -54,16 +59,27 @@ void AnimationPlayer::Tick(float deltaTime)
 		{
 			currentFrameIndex = 0;
 
+			// 한 바퀴 돌아 0번으로 돌아온 것도 "진입"이다. 매 바퀴 다시 울려야 한다.
+			framesEnteredThisTick.emplace_back(currentFrameIndex);
+
 			continue;
 		}
 
 		// 논루프 클립은 마지막 장에서 멈춘다.
+		// 마지막 장에는 이미 이전 반복에서 진입했으므로 여기서 또 기록하지 않는다.
 		currentFrameIndex = clip->GetFrameCount() - 1;
 		hasFinished = true;
+		hasJustFinished = true;
 		elapsedTime = 0.0f;
 
 		break;
 	}
+}
+
+void AnimationPlayer::ClearFrameEvents()
+{
+	framesEnteredThisTick.clear();
+	hasJustFinished = false;
 }
 
 void AnimationPlayer::Reset()
@@ -71,6 +87,11 @@ void AnimationPlayer::Reset()
 	elapsedTime = 0.0f;
 	currentFrameIndex = 0;
 	hasFinished = false;
+
+	// 0번 프레임에 "진입"한 것으로 친다.
+	// 그래야 클립을 처음 틀거나 다시 틀 때 0번 노티파이가 울린다.
+	// (Tick의 while 루프는 1번 프레임부터 기록하므로 여기서 안 넣으면 0번은 영영 안 울린다)
+	framesEnteredThisTick.emplace_back(0);
 }
 
 const Sprite* AnimationPlayer::GetCurrentSprite() const

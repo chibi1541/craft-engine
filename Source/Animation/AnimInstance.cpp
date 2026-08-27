@@ -29,14 +29,35 @@ std::shared_ptr<const AnimationClip> AnimInstance::FindClip(const std::string& n
 
 void AnimInstance::Tick(float deltaTime)
 {
+	// 노티파이 큐는 프레임 단위 수명이다. 매 틱 여기서 비운다.
+	notifyQueue.clear();
+
 	TickLayer(baseLayer, deltaTime);
 	TickLayer(overlayLayer, deltaTime);
+
+	// 재생이 다 끝난 뒤에 수집한다 - BaseLayer의 현재 상태가 정해져야
+	// Overlay를 내보낼지 말지 판단할 수 있기 때문이다.
+	CollectNotifies(baseLayer, false);
+
+	// 화면에서 가려진 Overlay는 이벤트도 내지 않는다.
+	// 구르기 중에 하체 Walk 클립이 녹음으로 돌아도 발소리가 나면 안 된다.
+	if (AllowsOverlay())
+	{
+		CollectNotifies(overlayLayer, true);
+	}
 
 	Composite();
 }
 
 void AnimInstance::TickLayer(AnimLayer& layer, float deltaTime)
 {
+	// 프레임 경계를 여기서 긋는다.
+	//
+	// AnimationPlayer::Tick 안에서 비우지 않는 이유 - 바로 아래에서 Play가 클립을 바꾸면
+	// Reset이 "0번 진입"을 기록하는데, Tick이 맨 앞에서 비우면 그게 지워진다.
+	// 상태 머신이 비어 있어 아래에서 얼리 아웃하더라도 비우기는 반드시 일어나야 한다.
+	layer.player.ClearFrameEvents();
+
 	// 얼리 아웃 - Overlay를 안 쓰는 액터는 상태 머신이 비어 있다.
 	// AnimStateMachine::Evaluate/GetCurrentState가 이미 널로 처리하므로 굳이 막지 않아도
 	// 안전하지만, 빈 레이어에서 매 틱 컨텍스트를 만들 이유가 없어 여기서 끝낸다.
@@ -77,6 +98,70 @@ void AnimInstance::TickLayer(AnimLayer& layer, float deltaTime)
 	layer.stateTime += deltaTime;
 }
 
+bool AnimInstance::AllowsOverlay() const
+{
+	// canBlend가 false인 BaseLayer 상태(구르기/사망 등)는 Overlay를 통째로 가린다.
+	// 상태가 아예 없으면(상태 머신을 안 쓰는 액터) 막을 이유가 없으므로 허용한다.
+	const AnimState* baseState = baseLayer.stateMachine.GetCurrentState();
+
+	return (nullptr == baseState) || baseState->canBlend;
+}
+
+void AnimInstance::CollectNotifies(const AnimLayer& layer, bool isOverlay)
+{
+	const AnimationClip* clip = layer.player.GetClip().get();
+
+	// 얼리 아웃 - 노티파이가 하나도 없는 클립이 대부분이다.
+	if (nullptr == clip || !clip->HasNotifies())
+	{
+		return;
+	}
+
+	const std::vector<AnimNotify>& notifies = clip->GetNotifies();
+	const std::vector<int>& framesEntered = layer.player.GetFramesEnteredThisTick();
+	const bool hasJustFinished = layer.player.HasJustFinished();
+
+	for (const AnimNotify& notify : notifies)
+	{
+		if (notify.fireOnFinish)
+		{
+			if (!hasJustFinished)
+			{
+				continue;
+			}
+
+			notifyQueue.emplace_back(AnimNotifyEvent{ notify.name, clip->GetName(), isOverlay });
+
+			continue;
+		}
+
+		// 이번 틱에 그 프레임으로 진입했는지 본다.
+		// 한 틱에 여러 장을 건너뛰었다면 목록에 전부 들어있으므로 중간 것도 놓치지 않는다.
+		for (int enteredFrame : framesEntered)
+		{
+			if (enteredFrame != notify.frameIndex)
+			{
+				continue;
+			}
+
+			notifyQueue.emplace_back(AnimNotifyEvent{ notify.name, clip->GetName(), isOverlay });
+		}
+	}
+}
+
+bool AnimInstance::HasNotify(const std::string& name) const
+{
+	for (const AnimNotifyEvent& notifyEvent : notifyQueue)
+	{
+		if (notifyEvent.name == name)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void AnimInstance::Composite()
 {
 	compositeBuffer.clear();
@@ -109,10 +194,10 @@ void AnimInstance::Composite()
 
 	// 2) BaseLayer 현재 상태가 허용해야만 Overlay를 얹는다.
 	// canBlend가 false인 BaseLayer 상태(구르기/사망 등)는 여기서 끝나 BaseLayer 한 장만 남는다.
-	const AnimState* baseState = baseLayer.stateMachine.GetCurrentState();
-	const bool baseAllowsOverlay = (nullptr == baseState) || baseState->canBlend;
-
-	if (baseAllowsOverlay)
+	//
+	// 노티파이 수집도 정확히 같은 판단을 쓴다(AnimInstance::Tick 참고).
+	// 두 곳이 따로 조건을 들고 있으면 한쪽만 바뀌었을 때 화면과 이벤트가 어긋난다.
+	if (AllowsOverlay())
 	{
 		const Sprite* overlaySprite = overlayLayer.player.GetCurrentSprite();
 		const AnimState* overlayState = overlayLayer.stateMachine.GetCurrentState();

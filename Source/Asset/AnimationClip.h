@@ -8,7 +8,32 @@
 
 NAME_SPACE_BEGIN(Craft)
 
-// TODO : 프레임 별 이벤트(람다 방식) 실행 구조 추가
+// 클립의 특정 시점에서 게임플레이에게 보내는 신호. (언리얼의 AnimNotify에 해당)
+//
+// 애니메이션 파이프라인은 "게임플레이 -> 파라미터 -> 전이 -> 클립 -> 프레임"으로 흐르는 단방향인데,
+// 노티파이가 그 유일한 역방향 채널이다.
+//   "구르기 클립이 끝났다"  -> 게임플레이가 조종 가능 상태로 되돌린다
+//   "공격 3번 프레임이다"   -> 게임플레이가 판정을 낸다
+//
+// 중요 - 노티파이는 게임플레이까지만 올라가고 파라미터를 직접 건드리지 않는다.
+// 노티파이가 파라미터를 쓰면 "노티파이 -> 파라미터 -> 전이 -> 노티파이" 순환이 생긴다.
+// 무엇을 할지는 언제나 게임플레이가 정한다.
+//
+// 상태(AnimState)가 아니라 클립이 소유한다 - 같은 클립을 여러 상태가 재생해도 선언은 하나면 되고,
+// "이 클립의 3번 프레임에서 판정이 나간다"는 애니메이션 자체의 속성이기 때문이다.
+struct CRAFT_API AnimNotify
+{
+	std::string name;
+
+	// fireOnFinish가 false일 때만 의미가 있다. 이 프레임에 "진입"하는 순간 발생한다.
+	int frameIndex = 0;
+
+	// true면 프레임이 아니라 "논루프 클립이 끝난 순간"에 발생한다. (XML의 frame="end")
+	//
+	// 마지막 프레임 노티파이와 다르다 - 그건 마지막 장에 "들어갈 때" 울리므로
+	// 클립이 실제로 끝나기 한 프레임 빠르다. 구르기 종료처럼 정확한 끝이 필요하면 이쪽을 쓴다.
+	bool fireOnFinish = false;
+};
 
 // 하나의 동작을 이루는 스프라이트 시퀀스. (언리얼의 AnimSequence에 해당)
 //
@@ -79,6 +104,16 @@ public:
 	static float GetDefaultPivotX(int width) { return (width - 1) * 0.5f; }
 	static float GetDefaultPivotY(int height) { return static_cast<float>(height - 1); }
 
+	// 노티파이를 등록한다. 잘못된 선언은 여기서 크래시한다.
+	//
+	// 생성자 인자로 받지 않는 이유 - 이미 6인자짜리 오버로드가 있어서 더 늘리면 호출부가 읽기 어렵다.
+	// 로더가 make_shared<AnimationClip>(비-const)로 만들어 이걸 호출한 뒤
+	// shared_ptr<const AnimationClip>로 넘기면(암시 변환) 밖에서는 변경할 수 없다.
+	void AddNotify(const AnimNotify& notify);
+
+	inline const std::vector<AnimNotify>& GetNotifies() const { return notifies; }
+	inline bool HasNotifies() const { return !notifies.empty(); }
+
 private:
 	// 프레임 크기가 모두 같은지 확인하고 width/height를 채운다.
 	void ValidateFrames();
@@ -96,6 +131,10 @@ private:
 
 	float pivotX = 0.0f;
 	float pivotY = 0.0f;
+
+	// 이 클립이 재생되는 동안 발생할 신호들. 선언 순서는 의미가 없다
+	// (한 프레임에 여러 개가 걸려 있으면 선언 순서대로 나가지만, 그걸 규약으로 삼지는 않는다).
+	std::vector<AnimNotify> notifies;
 
 	// fps가 아니라 "한 장당 지속 시간"으로 저장한다.
 	// 매 틱 나눗셈을 반복하지 않도록 생성 시점에 한 번만 역수를 구해둔다.

@@ -64,6 +64,14 @@ public:
 	inline void SetFlipX(bool newFlipX) { animInstance.SetFlipX(newFlipX); }
 	inline bool GetFlipX() const { return animInstance.GetFlipX(); }
 
+	// 애니메이션이 게임플레이에게 보내는 신호.
+	//
+	// Actor::Tick이 컴포넌트를 먼저 돌리므로, 게임플레이가 super::Tick(dt) 다음에 물어보면
+	// 같은 프레임 안에서 지연 없이 받는다.
+	//   if (animator->HasNotify("RollEnd")) { isRolling = false; }
+	inline bool HasNotify(const std::string& name) const { return animInstance.HasNotify(name); }
+	inline const std::vector<AnimNotifyEvent>& GetNotifies() const { return animInstance.GetNotifies(); }
+
 	inline bool HasClip(const std::string& name) const { return animInstance.HasClip(name); }
 	inline int GetClipCount() const { return animInstance.GetClipCount(); }
 

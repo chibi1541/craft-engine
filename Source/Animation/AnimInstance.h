@@ -8,9 +8,28 @@
 #include "Asset/AnimationClip.h"
 #include <string>
 #include <memory>
+#include <vector>
 #include <unordered_map>
 
 NAME_SPACE_BEGIN(Craft)
+
+// 이번 프레임에 실제로 발생한 노티파이 하나.
+//
+// 선언(AnimNotify)은 클립이 들고 있고, 이건 그게 "울린 결과"다.
+struct CRAFT_API AnimNotifyEvent
+{
+	std::string name;
+
+	// 어느 클립에서 났는지. 제네릭하게 처리할 때 쓴다.
+	std::string clipName;
+
+	// 어느 레이어에서 났는지.
+	//
+	// 필요한 이유 - Base와 Overlay가 같은 클립을 재생하는 경우가 실제로 있다
+	// (지금 TestActor의 캔버스에서 양쪽 다 Idle을 쓴다). 그럴 때 한 프레임에 같은 이름이
+	// 두 번 나오는데, 이 값이 없으면 어느 쪽에서 온 건지 구분할 방법이 없다.
+	bool isFromOverlay = false;
+};
 
 // 상태 머신 하나와 그 재생 상태를 묶은 단위.
 //
@@ -100,9 +119,30 @@ public:
 	//   좌상단 = 액터 위치 + offset - (피벗셀.x * scaleX, 피벗셀.y * scaleY)
 	Vector2 GetCurrentPivotCell() const;
 
+	// --- 노티파이 --------------------------------------------------------
+	// 애니메이션이 게임플레이에게 보내는 유일한 신호 경로.
+	//
+	// 큐는 Tick() 시작 시 비워진다. 프레임 단위 수명이라 "소비" 개념이 필요 없고,
+	// 같은 프레임 안에서 몇 번을 물어봐도 결과가 같다.
+	//
+	// Actor::Tick이 컴포넌트를 먼저 돌리므로, 게임플레이가 super::Tick() 다음에 읽으면
+	// 같은 프레임 안에서 지연 없이 받는다.
+	inline const std::vector<AnimNotifyEvent>& GetNotifies() const { return notifyQueue; }
+	bool HasNotify(const std::string& name) const;
+
 private:
 	// 레이어 하나의 상태를 갱신한다(전이 평가 -> 클립 적용 -> 시간 전진).
 	void TickLayer(AnimLayer& layer, float deltaTime);
+
+	// BaseLayer의 현재 상태가 Overlay를 화면에 내보내도 되는지.
+	//
+	// Composite()와 노티파이 수집이 반드시 같은 판단을 써야 해서 함수로 묶었다.
+	// 따로 복사해두면 나중에 한쪽만 바뀌었을 때
+	// "화면엔 안 보이는데 소리는 나는" 종류의 버그가 생긴다.
+	bool AllowsOverlay() const;
+
+	// 레이어의 이번 틱 프레임 이벤트를 클립의 노티파이 선언과 대조해 큐에 넣는다.
+	void CollectNotifies(const AnimLayer& layer, bool isOverlay);
 
 	// BaseLayer를 깔고, 허용되면 Overlay의 담당 영역을 얹어 compositeBuffer를 만든다.
 	void Composite();
@@ -125,6 +165,9 @@ private:
 	float compositePivotY = 0.0f;
 
 	bool flipX = false;
+
+	// 이번 프레임에 발생한 노티파이들. Tick() 시작 시 비워진다.
+	std::vector<AnimNotifyEvent> notifyQueue;
 };
 
 NAME_SPACE_END
