@@ -14,6 +14,46 @@ AnimationClip::AnimationClip(
 	ASSERT_CRASH(framesPerSecond > 0.0f);
 
 	frameDuration = 1.0f / framesPerSecond;
+
+	ValidateFrames();
+
+	// 피벗을 안 준 경우 - 가운데 맨 아래(발밑).
+	pivotX = GetDefaultPivotX(width);
+	pivotY = GetDefaultPivotY(height);
+}
+
+AnimationClip::AnimationClip(
+	const std::string& name,
+	const std::vector<Sprite>& frames,
+	float framesPerSecond,
+	bool isLooping,
+	float pivotX,
+	float pivotY)
+	: name(name), frames(frames), pivotX(pivotX), pivotY(pivotY), isLooping(isLooping)
+{
+	ASSERT_CRASH(framesPerSecond > 0.0f);
+
+	frameDuration = 1.0f / framesPerSecond;
+
+	ValidateFrames();
+}
+
+void AnimationClip::ValidateFrames()
+{
+	if (frames.empty())
+	{
+		return;
+	}
+
+	width = frames[0].GetWidth();
+	height = frames[0].GetHeight();
+
+	for (const Sprite& frame : frames)
+	{
+		// 한 클립에서 프레임 간의 사이즈가 동일해야 하는가는 조금 의문? -> 추후에 수정 할 수 있으면 수정
+		ASSERT_CRASH(frame.GetWidth() == width);
+		ASSERT_CRASH(frame.GetHeight() == height);
+	}
 }
 
 const Sprite& AnimationClip::GetFrame(int index) const

@@ -4,6 +4,35 @@
 
 NAME_SPACE_BEGIN(Craft)
 
+namespace
+{
+	// "3.5,7" 을 피벗 좌표로 나눈다. 형식이 틀리면 false.
+	// x가 실수인 이유는 짝수 너비의 가운데가 정수로 떨어지지 않기 때문이다(8칸이면 3.5).
+	bool ParsePivot(const std::string& text, OUT float& outX, OUT float& outY)
+	{
+		const size_t commaPos = text.find(',');
+
+		if (commaPos == std::string::npos)
+		{
+			return false;
+		}
+
+		const std::string xText = text.substr(0, commaPos);
+		const std::string yText = text.substr(commaPos + 1);
+
+		if (xText.empty() || yText.empty())
+		{
+			return false;
+		}
+
+		outX = static_cast<float>(::atof(xText.c_str()));
+		outY = static_cast<float>(::atof(yText.c_str()));
+
+		return true;
+	}
+}
+
+// TODO : AssetManager 쪽으로 기능 이전
 std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFromFile(const WCHAR* path)
 {
 	std::vector<std::shared_ptr<const AnimationClip>> clips;
@@ -69,7 +98,44 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 		// fps가 0 이하면 AnimationClip 생성자에서 크래시하므로 여기서 미리 거른다.
 		ASSERT_CRASH(framesPerSecond > 0.0f);
 
-		clips.emplace_back(std::make_shared<const AnimationClip>(name, frames, framesPerSecond, isLooping));
+		// width/height는 선언이지 정의가 아니다. 진실의 원천은 여전히 픽셀맵이고,
+		// 여기서는 대조만 한다. 선언이 픽셀맵을 이기게 하면 조용히 그림이 왜곡된다.
+		//
+		// 이 검사가 잡아주는 것 - Sprite 생성자는 "줄 길이가 서로 다른" 경우만 본다.
+		// 8x8이어야 할 클립에서 줄 하나가 통째로 빠져 8x7이 된 건 못 잡는다.
+		const int declaredWidth = clipNode.GetInt32Attr(L"width", 0);
+		const int declaredHeight = clipNode.GetInt32Attr(L"height", 0);
+
+		if (declaredWidth > 0)
+		{
+			ASSERT_CRASH(frames[0].GetWidth() == declaredWidth);
+		}
+
+		if (declaredHeight > 0)
+		{
+			ASSERT_CRASH(frames[0].GetHeight() == declaredHeight);
+		}
+
+		// pivot="x,y". 생략하면 프레임 크기에서 가운데 맨 아래(발밑)로 정해진다.
+		const std::string pivotText = FileUtils::Convert(clipNode.GetStringAttr(L"pivot", L""));
+
+		if (pivotText.empty())
+		{
+			clips.emplace_back(std::make_shared<const AnimationClip>(name, frames, framesPerSecond, isLooping));
+
+			continue;
+		}
+
+		float pivotX = 0.0f;
+		float pivotY = 0.0f;
+
+		const bool hasParsedPivot = ParsePivot(pivotText, pivotX, pivotY);
+
+		// 형식이 틀린 피벗을 0,0으로 넘겨버리면 캐릭터가 엉뚱한 곳에 붙는다.
+		ASSERT_CRASH(hasParsedPivot);
+
+		clips.emplace_back(std::make_shared<const AnimationClip>(
+			name, frames, framesPerSecond, isLooping, pivotX, pivotY));
 	}
 
 	return clips;

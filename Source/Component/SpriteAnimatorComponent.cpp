@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "SpriteAnimatorComponent.h"
 #include "Asset/SpriteAnimationLoader.h"
+#include "Asset/AnimStateMachineLoader.h"
 #include "Actor/Actor.h"
 #include "Render/Renderer.h"
 
@@ -12,15 +13,15 @@ void SpriteAnimatorComponent::Tick(float deltaTime)
 
 	// 시간을 밀어주는 건 여기서만 한다.
 	// Draw 체인에는 deltaTime이 없기 때문에 Draw에서는 결과만 읽어간다.
-	player.Tick(deltaTime);
+	animInstance.Tick(deltaTime);
 }
 
 void SpriteAnimatorComponent::Draw()
 {
-	// 얼리 아웃 - 지금 그릴 프레임이 없는 경우.
-	const Sprite* currentSprite = player.GetCurrentSprite();
+	// 얼리 아웃 - 이번 프레임에 그릴 게 없는 경우.
+	const std::string& pixelMap = animInstance.GetCurrentPixelMap();
 
-	if (nullptr == currentSprite || currentSprite->IsEmpty())
+	if (pixelMap.empty())
 	{
 		return;
 	}
@@ -33,10 +34,18 @@ void SpriteAnimatorComponent::Draw()
 		return;
 	}
 
+	// 액터 위치에 놓이는 건 스프라이트의 좌상단이 아니라 피벗(기본값은 발밑)이다.
+	//
+	// 피벗은 스프라이트 셀 단위라 화면 칸으로 환산해야 한다.
+	// SubmitPixels가 픽셀 하나를 scaleX칸씩 늘려 그리므로 배율을 곱해야
+	// 확대해도 발밑이 액터 위치에 붙어 있다.
+	const Vector2 pivotCell = animInstance.GetCurrentPivotCell();
+	const Vector2 pivotOffset(pivotCell.x * scaleX, pivotCell.y * scaleY);
+
 	Renderer::Get().SubmitPixels(
-		currentSprite->GetPixelMap(),
+		pixelMap,
 		SymbolPalette::GetTable(),
-		ownerActor->GetPosition() + offset,
+		ownerActor->GetPosition() + offset - pivotOffset,
 		ownerActor->GetSortingOrder(),
 		SymbolPalette::TransparentSymbol,
 		scaleX,
@@ -51,34 +60,42 @@ int SpriteAnimatorComponent::LoadClipsFromFile(const WCHAR* path)
 
 	for (const std::shared_ptr<const AnimationClip>& clip : loadedClips)
 	{
-		AddClip(clip);
+		animInstance.AddClip(clip);
 	}
 
 	return static_cast<int>(loadedClips.size());
 }
 
+int SpriteAnimatorComponent::LoadStateMachineFromFile(const WCHAR* path)
+{
+	return AnimStateMachineLoader::LoadIntoInstance(path, animInstance);
+}
+
 void SpriteAnimatorComponent::AddClip(const std::shared_ptr<const AnimationClip>& clip)
 {
-	// 빈 클립이나 이름 없는 클립은 이름으로 찾을 수 없으므로 데이터 실수로 본다.
-	ASSERT_CRASH(nullptr != clip);
-	ASSERT_CRASH(!clip->GetName().empty());
-
-	clipMap[clip->GetName()] = clip;
+	animInstance.AddClip(clip);
 }
 
 bool SpriteAnimatorComponent::PlayClip(const std::string& name, bool forceRestart)
 {
-	auto it = clipMap.find(name);
+	std::shared_ptr<const AnimationClip> clip = animInstance.FindClip(name);
 
 	// 등록되지 않은 이름. 크래시 대신 false를 돌려준다.
-	// 상태 머신이 매 틱 호출하게 될 자리라서, 여기서 게임을 죽이면 곤란하다.
-	if (it == clipMap.end())
+	if (nullptr == clip)
 	{
 		return false;
 	}
 
+	AnimLayer* layer = animInstance.GetLayer(0);
+
+	// 상태 머신을 안 쓰는 액터를 위해 전체를 담당하는 기본 레이어를 만들어 준다.
+	if (nullptr == layer)
+	{
+		layer = &animInstance.AddLayer("Base", AnimLayerMask());
+	}
+
 	// 같은 클립이면 Play()가 알아서 무시한다.
-	player.Play(it->second, forceRestart);
+	layer->player.Play(clip, forceRestart);
 
 	return true;
 }

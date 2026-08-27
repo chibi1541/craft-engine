@@ -3,27 +3,23 @@
 #include "Utils/EngineMacro.h"
 #include "Utils/Types.h"
 #include "Component/ActorComponent.h"
-#include "Animation/AnimationPlayer.h"
+#include "Animation/AnimInstance.h"
 #include "Math/Vector2.h"
 #include "Math/SymbolPalette.h"
 #include <string>
 #include <memory>
-#include <unordered_map>
 
 NAME_SPACE_BEGIN(Craft)
 
 // 액터에 스프라이트 애니메이션을 붙이는 컴포넌트.
-// (언리얼로 치면 SkeletalMeshComponent가 AnimInstance를 들고 있는 자리)
+// 언리얼의 USkeletalMeshComponent 자리다 - 화면에 그리고, AnimInstance를 소유한다.
 //
-// 클립 목록을 소유하고,
-//   Tick : 재생기(AnimationPlayer)의 시간을 밀어준다.
-//   Draw : 지금 프레임의 스프라이트를 Renderer::SubmitPixels로 제출한다.
+// 판단은 전부 AnimInstance가 한다. 이 컴포넌트는
+//   Tick : AnimInstance에 시간을 넘기고
+//   Draw : AnimInstance가 내놓은 픽셀맵을 Renderer에 제출한다
+// 그 이상은 하지 않는다.
 //
-// 기호 -> 색 변환표는 SymbolPalette가 공통으로 들고 있으므로 여기서 갖지 않는다.
-//
-// PlayClip()이 "이름으로 애니를 고르는" API라는 점이 다음 단계와의 연결 고리다.
-// 상태 머신을 얹으면 AnimState가 clipName을 들고 있고,
-// 매 틱 PlayClip(현재상태.clipName)을 호출하는 것만으로 동작하게 된다.
+// 게임플레이는 GetParameters()에 값만 넣는다. 클립 이름을 알 필요가 없다.
 class CRAFT_API SpriteAnimatorComponent : public ActorComponent
 {
 	TYPE_DECLARATIONS(SpriteAnimatorComponent, ActorComponent)
@@ -35,27 +31,41 @@ public:
 	virtual void Tick(float deltaTime) override;
 	virtual void Draw() override;
 
-	// XML 애니메이션 정의를 읽어서 클립을 한꺼번에 등록한다.
+	// XML 애니메이션 정의(*.anim.xml)를 읽어서 클립을 한꺼번에 등록한다.
 	// 등록된 클립 수를 반환한다(0이면 파일이 없거나 파싱 실패).
-	//
-	// TODO : 지금은 호출하는 액터가 경로를 직접 들고 있다.
-	//        애셋 매니저 / 데이터 애셋이 생기면 이미 만들어진 클립을 받아오는 형태로 바뀐다.
 	int LoadClipsFromFile(const WCHAR* path);
+
+	// XML 상태 머신 정의(*.fsm.xml)를 읽어서 레이어와 상태 머신을 채운다.
+	// 채운 레이어 수를 반환한다.
+	//
+	// 상태의 clip 이름을 검증하기 때문에 반드시 LoadClipsFromFile 다음에 호출해야 한다.
+	int LoadStateMachineFromFile(const WCHAR* path);
 
 	// 클립을 하나 등록한다. 키는 clip->GetName().
 	void AddClip(const std::shared_ptr<const AnimationClip>& clip);
 
-	// 등록된 클립을 이름으로 재생한다. 없는 이름이면 false.
-	// 이미 그 클립을 재생 중이면 아무 일도 일어나지 않는다(재생이 리셋되지 않음).
+	// 등록된 클립을 이름으로 직접 재생한다. 없는 이름이면 false.
+	//
+	// 상태 머신을 쓰지 않는 액터(클립 하나만 계속 트는 이펙트 등)를 위한 경로다.
+	// 상태 머신이 로드된 레이어에서는 매 틱 현재 상태의 클립으로 덮어쓰이므로
+	// 이 함수를 쓰면 안 된다. 그때는 GetParameters()로 파라미터만 바꿀 것.
 	bool PlayClip(const std::string& name, bool forceRestart = false);
 
 	// getter/setter
-	// 재생 상태를 직접 다뤄야 할 때(HasFinished, SetPlayRate 등) 쓴다.
-	inline AnimationPlayer& GetPlayer() { return player; }
-	inline const AnimationPlayer& GetPlayer() const { return player; }
+	// 게임플레이가 애니메이션에 값을 건네는 창구.
+	inline AnimParameters& GetParameters() { return animInstance.GetParameters(); }
 
-	inline bool HasClip(const std::string& name) const { return clipMap.find(name) != clipMap.end(); }
-	inline int GetClipCount() const { return static_cast<int>(clipMap.size()); }
+	// 레이어/재생 상태를 직접 다뤄야 할 때.
+	inline AnimInstance& GetAnimInstance() { return animInstance; }
+	inline const AnimInstance& GetAnimInstance() const { return animInstance; }
+
+	// 좌우 반전. 아트가 그려진 방향이 false다.
+	// 피벗을 축으로 뒤집으므로 방향을 바꿔도 캐릭터 위치는 그대로다.
+	inline void SetFlipX(bool newFlipX) { animInstance.SetFlipX(newFlipX); }
+	inline bool GetFlipX() const { return animInstance.GetFlipX(); }
+
+	inline bool HasClip(const std::string& name) const { return animInstance.HasClip(name); }
+	inline int GetClipCount() const { return animInstance.GetClipCount(); }
 
 	// 콘솔 셀은 정사각형이 아니라서 비율 보정이 필요하다.
 	// 스프라이트를 크게 그릴 때도 같이 쓴다. (Renderer::SubmitPixels 참고)
@@ -72,11 +82,8 @@ public:
 	inline Vector2 GetOffset() const { return offset; }
 
 private:
-	// 재생 위치를 관리하는 시간 커서.
-	AnimationPlayer player;
-
-	// 이름 -> 클립. 클립 실체는 공유되므로 shared_ptr<const>.
-	std::unordered_map<std::string, std::shared_ptr<const AnimationClip>> clipMap;
+	// 파라미터 + 레이어 + 상태 머신 + 합성을 전부 들고 있는 애니메이션의 주체.
+	AnimInstance animInstance;
 
 	Vector2 offset = Vector2::Zero;
 

@@ -105,7 +105,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Source\Animation\AnimationPlayer.cpp" />
+    <ClCompile Include="Source\Animation\AnimCondition.cpp" />
+    <ClCompile Include="Source\Animation\AnimInstance.cpp" />
+    <ClCompile Include="Source\Animation\AnimParameters.cpp" />
+    <ClCompile Include="Source\Animation\AnimStateMachine.cpp" />
     <ClCompile Include="Source\Asset\AnimationClip.cpp" />
+    <ClCompile Include="Source\Asset\AnimStateMachineLoader.cpp" />
     <ClCompile Include="Source\Asset\Image.cpp" />
     <ClCompile Include="Source\Asset\Sprite.cpp" />
     <ClCompile Include="Source\Asset\SpriteAnimationLoader.cpp" />
@@ -129,7 +134,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationPlayer.h" />
+    <ClInclude Include="Source\Animation\AnimCondition.h" />
+    <ClInclude Include="Source\Animation\AnimInstance.h" />
+    <ClInclude Include="Source\Animation\AnimParameters.h" />
+    <ClInclude Include="Source\Animation\AnimStateMachine.h" />
     <ClInclude Include="Source\Asset\AnimationClip.h" />
+    <ClInclude Include="Source\Asset\AnimStateMachineLoader.h" />
     <ClInclude Include="Source\Asset\Image.h" />
     <ClInclude Include="Source\Asset\Sprite.h" />
     <ClInclude Include="Source\Asset\SpriteAnimationLoader.h" />
