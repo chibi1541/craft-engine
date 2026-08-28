@@ -90,7 +90,9 @@ void Renderer::Submit(
 	const std::string& image,
 	const Vector2& position,
 	Color color,
-	int sortingOrder)
+	int sortingOrder,
+	std::optional<Color> backgroundColor,
+	std::optional<Rect> clipRect)
 {
 	// 개행 문자(\n) 기준으로 줄 단위로 쪼개서 각 줄을 별도의 RenderCommand로 큐에 추가.
 	// 이렇게 하면 DrawRenderQueue()의 한 줄 처리 로직(컬링/클리핑/z-order)을
@@ -102,6 +104,8 @@ void Renderer::Submit(
 		command.image = line;
 		command.position = Vector2(position.x, position.y + lineOffset);
 		command.color = color;
+		command.backgroundColor = backgroundColor;
+		command.clipRect = clipRect;
 		command.sortingOrder = sortingOrder;
 
 		// 렌더 큐에 명령 추가.
@@ -116,7 +120,8 @@ void Renderer::SubmitPixels(
 	int sortingOrder,
 	char transparentSymbol,
 	int scaleX,
-	int scaleY)
+	int scaleY,
+	std::optional<Rect> clipRect)
 {
 	ASSERT_CRASH(scaleX >= 1 && scaleY >= 1);
 
@@ -158,6 +163,7 @@ void Renderer::SubmitPixels(
 			command.sortingOrder = sortingOrder;
 			command.pixelColors = lineColors;
 			command.image = dummyImage;
+			command.clipRect = clipRect;
 
 			renderQueue.emplace_back(std::move(command));
 		}
@@ -205,8 +211,25 @@ void Renderer::DrawRenderQueue()
 		}
 
 		{
-			// y위치가 화면을 벗어났으면 컬링
-			if (command.position.y < 0 || command.position.y >= screenSize.y)
+			// 그릴 수 있는 영역 = 화면 전체, 명령에 클립이 있으면 그것과의 교집합.
+			//
+			// 화면 컬링과 클리핑을 하나의 사각형으로 합쳐두면
+			// 아래 컬링/클리핑 계산을 두 벌로 나눠 쓰지 않아도 된다.
+			Rect drawableRect(Vector2::Zero, screenSize);
+
+			if (command.clipRect.has_value())
+			{
+				drawableRect = drawableRect.Intersect(*command.clipRect);
+
+				// 클립 영역이 화면 밖이면 그릴 것이 없다.
+				if (drawableRect.IsEmpty())
+				{
+					continue;
+				}
+			}
+
+			// y위치가 그릴 수 있는 영역을 벗어났으면 컬링
+			if (command.position.y < drawableRect.GetTop() || command.position.y > drawableRect.GetBottom())
 			{
 				continue;
 			}
@@ -220,17 +243,17 @@ void Renderer::DrawRenderQueue()
 			// 글자의 끝 위치
 			const int endX = startX + length - 1;
 
-			// x 위치가 화면을 벗어났는지 확인
-			if (endX < 0 || startX >= screenSize.x)
+			// x 위치가 그릴 수 있는 영역을 벗어났는지 확인
+			if (endX < drawableRect.GetLeft() || startX > drawableRect.GetRight())
 			{
 				continue;
 			}
 
 			// 실제 그릴 글자의 위치 구하기
-			// 0위치의 문자부터 그리게 startX를 조절
-			const int visibleStart = startX < 0 ? 0 : startX;
-			// 범위를 벗어나는 문자를 잘라내도록 screenSize.x - 1 만큼으로 범위를 좁힘
-			const int visibleEnd = endX >= screenSize.x ? screenSize.x - 1 : endX;
+			// 영역 왼쪽 밖으로 나간 문자를 건너뛰도록 startX를 조절
+			const int visibleStart = startX < drawableRect.GetLeft() ? drawableRect.GetLeft() : startX;
+			// 영역 오른쪽 밖으로 나가는 문자를 잘라내도록 범위를 좁힘
+			const int visibleEnd = endX > drawableRect.GetRight() ? drawableRect.GetRight() : endX;
 
 			// 픽셀(배경색) 렌더 명령인지 여부 - pixelColors가 채워져 있으면 픽셀 경로.
 			const bool isPixelCommand = !command.pixelColors.empty();
@@ -269,8 +292,19 @@ void Renderer::DrawRenderQueue()
 					// 2차원 배열에 글자, 속성 설정
 					frame->charInfoArray[index].Char.AsciiChar = command.image[sourceIndex];
 
-					// 글자 색상 값 설정
-					frame->charInfoArray[index].Attributes = static_cast<WORD>(command.color);
+					// 글자 색상 값 설정.
+					//
+					// 속성은 [상위 4비트 = 배경색][하위 4비트 = 전경색]이다.
+					// 배경색을 안 주면 상위 니블이 0(검정)이 되므로,
+					// 패널 배경 위에 글자를 올릴 때는 반드시 배경색을 함께 넘겨야 한다.
+					WORD attributes = static_cast<WORD>(command.color);
+
+					if (command.backgroundColor.has_value())
+					{
+						attributes |= ToBackgroundAttribute(*command.backgroundColor);
+					}
+
+					frame->charInfoArray[index].Attributes = attributes;
 				}
 
 				// 그리기 우선순위 값 설정

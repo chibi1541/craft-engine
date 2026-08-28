@@ -68,6 +68,9 @@ private:
 	// 키 하나의 이벤트 하나를 적절한 핸들러에게 보낸다.
 	void RouteEvent(int keyCode, EInputEvent event);
 
+	// 키 소유권을 놓는다. 키를 뗐을 때만 부른다.
+	void ReleaseKeyOwnership(int keyCode);
+
 private:
 	// 등록된 핸들러 목록. 우선순위 내림차순으로 정렬해서 들고 있다.
 	std::vector<HandlerEntry> handlers;
@@ -82,6 +85,13 @@ private:
 	// 키 단위 소유권(래치).
 	// Pressed를 소비한 핸들러가 그 키를 뗄 때까지 계속 소유한다.
 	std::weak_ptr<InputHandler> keyOwners[KeyCount];
+
+	// 이 키에 소유자가 지정된 적이 있는지.
+	//
+	// keyOwners만으로는 "원래 주인이 없던 키"와 "주인이 죽은 키"를 구분할 수 없다.
+	// weak_ptr은 둘 다 lock에 실패하기 때문이다.
+	// 이 구분이 필요한 이유는 아래 RouteEvent 주석에 있다.
+	bool keyHasOwner[KeyCount] = {};
 
 	// 다음 디스패치 전에 정렬이 필요한지 여부.
 	bool needsSort = false;

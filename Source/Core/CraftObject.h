@@ -6,7 +6,16 @@ NAME_SPACE_BEGIN(Craft)
 class CRAFT_API CraftObject
 {
 public:
-	~CraftObject() = default;
+	// 가상 소멸자.
+	//
+	// GetType()이 순수 가상이라 vptr은 이미 있다. 따라서 이걸 가상으로 만들어도
+	// 객체 크기는 그대로고 vtable 슬롯 하나만 는다.
+	//
+	// 원래는 모든 객체를 make_shared<파생타입>으로만 만드는 규약 덕분에
+	// shared_ptr의 타입 소거 deleter가 정확한 소멸자를 기억해서 문제가 없었다.
+	// 하지만 그 안전성이 전적으로 "규약을 지킨다"에만 걸려 있었고,
+	// UI 위젯은 액터보다 훨씬 자주 동적으로 만들어져서 실수 확률이 높다.
+	virtual ~CraftObject() = default;
 
 	// 현재 객체 타입의 ID를 반환하는 함수
 	// 순수 가상함수로 만들기 -> 상속하는 계층에 구현을 강제

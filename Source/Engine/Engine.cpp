@@ -10,6 +10,7 @@
 #include "Asset/SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
 #include "Thread/ThreadManager.h"
+#include "UI/UISystem.h"
 
 #include <memory>
 
@@ -39,6 +40,10 @@ Engine::Engine()
 
 	// 랜더러 객체 생성
 	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
+
+	// UI 시스템 생성.
+	// 위젯 배치가 화면 크기를 필요로 하므로 renderer 다음이어야 한다.
+	uiSystem = std::make_unique<UI::UISystem>();
 
 	// 애셋 매니저 생성 + 타입별 로더 등록.
 	assetManager = std::make_unique<AssetManager>();
@@ -142,6 +147,19 @@ void Engine::Run()
 			{
 				if (nullptr != mainLevel)
 				{
+					// 레벨에 딸린 UI(HUD 등)를 함께 내린다.
+					// 안 그러면 이전 레벨의 창이 새 레벨로 그대로 넘어온다.
+					// 메인 메뉴처럼 persistent로 올린 것만 남는다.
+					//
+					// 이전 레벨이 있을 때만 하는 것이 중요하다.
+					// 첫 레벨을 올리는 건 "교체"가 아니라 최초 적재다.
+					// 여기서 무조건 지우면 Run() 전에 올려둔 UI가
+					// 첫 프레임에 통째로 사라진다.
+					if (uiSystem)
+					{
+						uiSystem->ClearNonPersistent();
+					}
+
 					mainLevel.reset();
 				}
 
@@ -155,6 +173,16 @@ void Engine::Run()
 			if (mainLevel)
 			{
 				mainLevel->ProcessAddAndDestoryActors();
+			}
+
+			// 추가 or 제거 요청된 위젯 정리.
+			//
+			// 액터와 같은 자리에서 같은 방식으로 처리한다.
+			// 프레임 도중에 위젯이 사라지지 않으므로, 입력 콜백 안에서 창을 닫아도
+			// 그 프레임의 남은 입력 처리가 죽은 핸들러를 만나는 일이 없다.
+			if (uiSystem)
+			{
+				uiSystem->ProcessPendingWidgets();
 			}
 
 			// 이번 프레임의 입력 상태 캐싱
@@ -250,6 +278,17 @@ void Engine::BeginPlay()
 	mainLevel->BeginPlay();
 }
 
+int Engine::GetWidth() const
+{
+	// 렌더러가 실제로 잡은 크기가 진실이다. 설정값은 "요청"일 뿐이다.
+	return renderer ? renderer->GetScreenSize().x : setting.width;
+}
+
+int Engine::GetHeight() const
+{
+	return renderer ? renderer->GetScreenSize().y : setting.height;
+}
+
 void Engine::Tick(float deltaTime)
 {
 	// 레벨 유무와 무관하게 애셋 유휴 정리는 항상 돈다.
@@ -258,27 +297,41 @@ void Engine::Tick(float deltaTime)
 		assetManager->Tick(deltaTime);
 	}
 
-	// 상용 엔진의 경우 code style은 얼리 아웃의 경우가 많음
-	if (!mainLevel)
+	// 레벨이 없어도 엔진은 계속 돈다.
+	// 레벨 없이 메인 메뉴만 띄우는 상태가 있기 때문에,
+	// 여기서 통째로 얼리 아웃하면 그런 화면이 아예 동작하지 않는다.
+	if (mainLevel)
 	{
-		return;
+		mainLevel->Tick(deltaTime);
 	}
 
-	mainLevel->Tick(deltaTime);
+	// UI는 레벨과 무관하게 돈다. 레벨 없이 메뉴만 떠 있는 상태가 있기 때문이다.
+	// 레벨 다음인 이유는 게임플레이가 이번 프레임에 바꾼 값(체력 등)을
+	// UI가 같은 프레임에 읽게 하기 위해서다.
+	if (uiSystem)
+	{
+		uiSystem->Tick(deltaTime);
+	}
 }
 
 void Engine::Draw()
 {
-	if (!mainLevel)
+	// 여기서 레벨에 속해있는 액터 객체가 rendercommand에 드로우콜을 등록
+	if (mainLevel)
 	{
-		return;
+		mainLevel->Draw();
 	}
 
-	// 여기서 레벨에 속해있는 액터 객체가 rendercommand에 드로우콜을 등록
-	mainLevel->Draw();
-
+	// 렌더러가 없으면 제출할 곳이 없다.
 	if (!renderer)
 		return;
+
+	// UI는 액터 뒤에 제출한다. 월드의 무엇에도 가려지지 않아야 한다.
+	// 정렬 순서(RenderLayer::UI)로도 액터보다 위지만, 제출 순서도 맞춰 둔다.
+	if (uiSystem)
+	{
+		uiSystem->Paint();
+	}
 
 	// 프레임 수 표시.
 	// 어떤 액터에도 가려지지 않도록 정렬 순서를 최대로 준다.

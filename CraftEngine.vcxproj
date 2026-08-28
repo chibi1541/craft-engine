@@ -55,7 +55,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ENGINE_BUILD_DLL;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENGINE_BUILD_DLL;NOMINMAX;</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -82,7 +82,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ENGINE_BUILD_DLL;</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENGINE_BUILD_DLL;NOMINMAX;</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -136,8 +136,14 @@
     <ClCompile Include="Source\Math\SymbolPalette.cpp" />
     <ClCompile Include="Source\Math\Vector2.cpp" />
     <ClCompile Include="Source\pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Source\UI\Border.cpp" />
+    <ClCompile Include="Source\UI\PanelWidget.cpp" />
+    <ClCompile Include="Source\UI\TextBlock.cpp" />
+    <ClCompile Include="Source\UI\UISystem.cpp" />
+    <ClCompile Include="Source\UI\UserWidget.cpp" />
+    <ClCompile Include="Source\UI\Widget.cpp" />
     <ClCompile Include="Source\Render\Renderer.cpp" />
     <ClCompile Include="Source\Render\ScreenBuffer.cpp" />
     <ClCompile Include="Source\Thread\ThreadManager.cpp" />
@@ -178,9 +184,18 @@
     <ClInclude Include="Source\Level\Level.h" />
     <ClInclude Include="Source\Math\Color.h" />
     <ClInclude Include="Source\Math\Palette.h" />
+    <ClInclude Include="Source\Math\Rect.h" />
     <ClInclude Include="Source\Math\SymbolPalette.h" />
     <ClInclude Include="Source\Math\Vector2.h" />
     <ClInclude Include="Source\pch.h" />
+    <ClInclude Include="Source\UI\Border.h" />
+    <ClInclude Include="Source\UI\Geometry.h" />
+    <ClInclude Include="Source\UI\PanelWidget.h" />
+    <ClInclude Include="Source\UI\TextBlock.h" />
+    <ClInclude Include="Source\UI\UISystem.h" />
+    <ClInclude Include="Source\UI\UserWidget.h" />
+    <ClInclude Include="Source\UI\Widget.h" />
+    <ClInclude Include="Source\Render\RenderLayer.h" />
     <ClInclude Include="Source\Render\Renderer.h" />
     <ClInclude Include="Source\Render\ScreenBuffer.h" />
     <ClInclude Include="Source\Thread\ThreadManager.h" />

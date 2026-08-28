@@ -154,7 +154,7 @@ void InputSystem::DispatchInput()
 
 				// 키를 뗐으므로 소유권을 놓는다.
 				// Released를 보낸 다음에 풀어야 소비한 쪽이 짝을 받는다.
-				keyOwners[keyCode].reset();
+				ReleaseKeyOwnership(keyCode);
 			}
 
 			if (wasPressed)
@@ -176,7 +176,7 @@ void InputSystem::DispatchInput()
 			{
 				RouteEvent(keyCode, EInputEvent::Released);
 
-				keyOwners[keyCode].reset();
+				ReleaseKeyOwnership(keyCode);
 			}
 		}
 	}
@@ -185,23 +185,42 @@ void InputSystem::DispatchInput()
 	dispatchCache.clear();
 }
 
+void InputSystem::ReleaseKeyOwnership(int keyCode)
+{
+	keyOwners[keyCode].reset();
+	keyHasOwner[keyCode] = false;
+}
+
 void InputSystem::RouteEvent(int keyCode, EInputEvent event)
 {
 	// 이 키를 이미 소유한 핸들러가 있으면 그쪽으로만 보낸다.
-	std::shared_ptr<InputHandler> owner = keyOwners[keyCode].lock();
-
-	if (nullptr != owner)
+	if (keyHasOwner[keyCode])
 	{
-		if (owner->IsEffectivelyEnabled())
+		std::shared_ptr<InputHandler> owner = keyOwners[keyCode].lock();
+
+		if (nullptr != owner && owner->IsEffectivelyEnabled())
 		{
 			bool consumed = false;
 			owner->HandleInput(keyCode, event, consumed);
 			return;
 		}
 
-		// 소유자가 비활성이 됐으면 소유권을 놓고 아래로 흘려보낸다.
-		// (메뉴가 닫히는 등)
+		// 소유자가 죽었거나 입력을 못 받는 상태가 됐다.
+		//
+		// 여기서 아래 우선순위로 흘려보내면 안 된다.
+		// Pressed를 못 본 쪽이 Released나 Held만 받게 되기 때문이다.
+		//
+		// 실제로 이렇게 샌다:
+		//   Esc Pressed -> 메뉴가 소비, 소유권 획득
+		//   콜백이 메뉴를 닫음(숨김/파괴)
+		//   DispatchInput이 곧바로 같은 프레임의 Held를 라우팅
+		//   -> 소유자가 사라졌으니 게임플레이가 Esc Held를 받는다
+		// 메뉴를 닫는 Esc가 그 프레임의 게임플레이까지 건드리는 셈이다.
+		//
+		// 그래서 소유권만 놓고(약참조 정리), keyHasOwner는 켜 둔 채
+		// 키를 실제로 뗄 때까지 이 키의 이벤트를 전부 삼킨다.
 		keyOwners[keyCode].reset();
+		return;
 	}
 
 	// 우선순위가 높은 쪽부터 순회.
@@ -230,6 +249,7 @@ void InputSystem::RouteEvent(int keyCode, EInputEvent event)
 
 		// 이 키를 뗄 때까지 이 핸들러가 소유한다.
 		keyOwners[keyCode] = handler;
+		keyHasOwner[keyCode] = true;
 		return;
 	}
 }

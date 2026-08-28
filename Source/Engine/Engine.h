@@ -9,6 +9,11 @@ class Renderer;
 class AssetManager;
 class ThreadManager;
 
+namespace UI
+{
+	class UISystem;
+}
+
 
 // dll에서 외부 모듈로 노출시키겠다는 키워드
 // 언리얼의 모듈이름_API 키워드와 비슷
@@ -50,8 +55,17 @@ public:
 	// Engine::Get(); -> Engine의 instance를 반환
 	static Engine& Get();
 
-	inline int GetWidth() const { return setting.width; }
-	inline int GetHeight() const { return setting.height; }
+	// 실제로 잡힌 화면 크기(콘솔 셀 개수).
+	//
+	// Setting.txt의 값을 그대로 돌려주면 안 된다.
+	// 콘솔은 화면 해상도/폰트에 따라 요청한 크기를 못 잡아주고,
+	// ScreenBuffer가 GetLargestConsoleWindowSize로 줄여서 잡는다.
+	// 설정값을 믿고 UI를 배치하면 화면 밖에 그리게 되고,
+	// 마우스 좌표(실제 셀 좌표)와도 좌표계가 어긋난다.
+	//
+	// renderer가 만들어지기 전(엔진 생성 도중)에는 설정값으로 답한다.
+	int GetWidth() const;
+	int GetHeight() const;
 
 	// 현재 프레임 수
 	inline float GetFps() const { return currentFps; }
@@ -122,6 +136,15 @@ protected:
 	std::unique_ptr<InputSystem> inputSystem;
 
 	std::unique_ptr<Renderer> renderer;
+
+	// 화면에 올라간 위젯들의 갱신/배치/그리기를 담당.
+	//
+	// renderer 다음에 두는 이유가 앞뒤로 하나씩 있다.
+	//  - 생성: renderer 다음이어야 실제로 잡힌 화면 크기를 알 수 있다.
+	//          inputSystem 다음이기도 해야 위젯이 입력 핸들러를 등록할 수 있다.
+	//  - 파괴: renderer/inputSystem보다 먼저 죽어야
+	//          위젯이 이미 사라진 렌더러나 입력 시스템을 건드리지 않는다.
+	std::unique_ptr<UI::UISystem> uiSystem;
 
 	// 애셋 로드/캐싱/유휴 언로드를 담당
 	std::unique_ptr<AssetManager> assetManager;
