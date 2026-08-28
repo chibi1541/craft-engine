@@ -32,3 +32,14 @@
 		__analysis_assume(expr);	\
 	}								\
 }
+
+// ###########################
+// #		Lock			 #
+// ###########################
+
+#define USE_MANY_LOCKS(count)	Craft::Lock _locks[count];
+#define USE_LOCK				USE_MARY_LOCKS(0);
+#define READ_LOCK_IDX(idx)		Craft::ReadLockGuard readLockGuard_##idx(_locks[idx], typeid(this).name());
+#define READ_LOCK				READ_LOCK_IDX(0)
+#define WRITE_LOCK_IDX(idx)		Craft::WriteLockGuard writeLockGuard_##idx(_locks[idx], typeid(this).name());
+#define WRITE_LOCK				WRITE_LOCK_IDX(0)

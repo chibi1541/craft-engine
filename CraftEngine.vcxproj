@@ -104,6 +104,8 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Job.cpp" />
+    <ClCompile Include="Source\Thread\Lock.cpp" />
     <ClCompile Include="Source\Animation\AnimationPlayer.cpp" />
     <ClCompile Include="Source\Animation\AnimCondition.cpp" />
     <ClCompile Include="Source\Animation\AnimInstance.cpp" />
@@ -135,10 +137,14 @@
     </ClCompile>
     <ClCompile Include="Source\Render\Renderer.cpp" />
     <ClCompile Include="Source\Render\ScreenBuffer.cpp" />
+    <ClCompile Include="Source\Thread\ThreadManager.cpp" />
     <ClCompile Include="Source\Utils\CorePch.cpp" />
     <ClCompile Include="Source\Xml\XmlParser.cpp" />
+    <ClCompile Include="Source\Thread\TLS.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Job.h" />
+    <ClInclude Include="Source\Thread\Lock.h" />
     <ClInclude Include="Source\Animation\AnimationPlayer.h" />
     <ClInclude Include="Source\Animation\AnimCondition.h" />
     <ClInclude Include="Source\Animation\AnimInstance.h" />
@@ -170,6 +176,7 @@
     <ClInclude Include="Source\pch.h" />
     <ClInclude Include="Source\Render\Renderer.h" />
     <ClInclude Include="Source\Render\ScreenBuffer.h" />
+    <ClInclude Include="Source\Thread\ThreadManager.h" />
     <ClInclude Include="Source\Utils\CorePch.h" />
     <ClInclude Include="Source\Utils\EngineMacro.h" />
     <ClInclude Include="Source\Utils\FileUtils.h" />
@@ -180,6 +187,7 @@
     <ClInclude Include="Source\Xml\rapidxml_print.hpp" />
     <ClInclude Include="Source\Xml\rapidxml_utils.hpp" />
     <ClInclude Include="Source\Xml\XmlParser.h" />
+    <ClInclude Include="Source\Thread\TLS.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
