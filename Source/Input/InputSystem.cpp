@@ -133,27 +133,51 @@ void InputSystem::DispatchInput()
 			continue;
 		}
 
-		// 이벤트 순서는 Pressed -> Held -> Released로 고정한다.
+		// 이벤트 순서는 프레임이 끝난 시점의 실제 상태를 보고 정한다.
 		//
-		// 한 프레임 안에서 눌렀다 뗀 경우 isKeyDown이 false라 Held만 건너뛰고
-		// Pressed와 Released가 순서대로 발생한다.
-		if (input.GetKeyDown(keyCode))
-		{
-			RouteEvent(keyCode, EInputEvent::Pressed);
-		}
+		// 순서를 Pressed -> Held -> Released로 고정하면, 한 프레임에
+		// 눌림/뗌/눌림이 다 들어왔을 때(빠른 더블클릭) 마지막 전이가 눌림인데도
+		// Released를 맨 뒤에 보내게 된다. 그러면 핸들러는 떼진 줄 아는데
+		// Held는 계속 발생하고, 래치도 엉뚱한 시점에 풀린다.
+		const bool isDown = input.GetKey(keyCode);
+		const bool wasPressed = input.GetKeyDown(keyCode);
+		const bool wasReleased = input.GetKeyUp(keyCode);
 
-		if (input.GetKey(keyCode))
+		if (isDown)
 		{
+			// 마지막 전이가 눌림이다.
+			// 뗌 플래그도 켜져 있으면 그게 먼저 있었다는 뜻이므로,
+			// Released를 먼저 보내 앞선 Pressed와 짝을 맞춘 뒤 새로 누른 것으로 친다.
+			if (wasReleased)
+			{
+				RouteEvent(keyCode, EInputEvent::Released);
+
+				// 키를 뗐으므로 소유권을 놓는다.
+				// Released를 보낸 다음에 풀어야 소비한 쪽이 짝을 받는다.
+				keyOwners[keyCode].reset();
+			}
+
+			if (wasPressed)
+			{
+				RouteEvent(keyCode, EInputEvent::Pressed);
+			}
+
 			RouteEvent(keyCode, EInputEvent::Held);
 		}
-
-		if (input.GetKeyUp(keyCode))
+		else
 		{
-			RouteEvent(keyCode, EInputEvent::Released);
+			// 마지막 전이가 뗌이거나, 이미 떼진 채로 유지되는 상태.
+			if (wasPressed)
+			{
+				RouteEvent(keyCode, EInputEvent::Pressed);
+			}
 
-			// 키를 뗐으므로 소유권을 놓는다.
-			// Released를 보낸 다음에 풀어야 소비한 쪽이 짝을 받는다.
-			keyOwners[keyCode].reset();
+			if (wasReleased)
+			{
+				RouteEvent(keyCode, EInputEvent::Released);
+
+				keyOwners[keyCode].reset();
+			}
 		}
 	}
 

@@ -109,6 +109,36 @@ namespace Craft
 		state.isKeyDown = isKeyDown;
 	}
 
+	bool Input::HasConsoleFocus() const
+	{
+		return GetConsoleWindow() == GetForegroundWindow();
+	}
+
+	void Input::ReconcileMouseButtons()
+	{
+		// 포커스가 있을 때만 보정한다.
+		// GetAsyncKeyState는 창과 무관하게 전역 상태를 읽기 때문에,
+		// 포커스가 없을 때 부르면 다른 창에서 누른 버튼이 그대로 들어온다.
+		if (!HasConsoleFocus())
+		{
+			return;
+		}
+
+		// 콘솔은 물리적 위치(가장 왼쪽 버튼)를 보고하는데 VK_LBUTTON은 논리적인
+		// 주 버튼이라, 사용자가 좌우 버튼을 바꿔 놨으면 둘이 어긋난다.
+		// 이벤트 스트림과 싸우지 않도록 여기서 맞춰준다.
+		const bool isSwapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+
+		const int leftKeyCode = isSwapped ? VK_RBUTTON : VK_LBUTTON;
+		const int rightKeyCode = isSwapped ? VK_LBUTTON : VK_RBUTTON;
+
+		// 이미 이벤트로 갱신된 상태와 같으면 UpdateKeyState가 전이로 치지 않으므로
+		// 아무 일도 일어나지 않는다. 어긋났을 때만 전이가 기록된다.
+		UpdateKeyState(VK_LBUTTON, (GetAsyncKeyState(leftKeyCode) & 0x8000) != 0);
+		UpdateKeyState(VK_RBUTTON, (GetAsyncKeyState(rightKeyCode) & 0x8000) != 0);
+		UpdateKeyState(VK_MBUTTON, (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0);
+	}
+
 	void Input::ProcessInput()
 	{
 		// 콘솔 입력 핸들이 유효하지 않으면 입력 처리 종료.
@@ -222,6 +252,11 @@ namespace Craft
 				}
 			}
 		}
+
+		// 이벤트를 다 읽은 뒤 마우스 버튼만 실제 상태로 보정한다.
+		// 더블클릭의 두 번째 해제 이벤트가 오지 않아 눌린 채로 남는 것을 여기서 푼다.
+		// 키보드는 해제 이벤트가 신뢰할 만하므로 대상이 아니다.
+		ReconcileMouseButtons();
 	}
 
 	void Input::SavePreviousStates()

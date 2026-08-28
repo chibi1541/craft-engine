@@ -73,6 +73,20 @@ namespace Craft
 		// Pressed 이벤트가 매 프레임 연사되지 않는다.
 		void UpdateKeyState(int keyCode, bool isKeyDown);
 
+		// 마우스 버튼 상태를 실제 상태로 맞추는 함수.
+		//
+		// 콘솔은 더블클릭의 두 번째 클릭을 DOUBLE_CLICK 이벤트 하나로 보내는데,
+		// 그에 대응하는 버튼 해제 이벤트가 오지 않는다.
+		// 마우스 이벤트는 상태가 바뀔 때만 오기 때문에 보정하지 않으면
+		// 커서를 움직여 다음 이벤트가 올 때까지 버튼이 눌린 채로 남는다.
+		void ReconcileMouseButtons();
+
+		// 콘솔 창이 입력 포커스를 가지고 있는지 확인하는 함수.
+		//
+		// FOCUS_EVENT는 문서상 "내부용이므로 무시하라"고 되어 있어서 신뢰하기 어렵다.
+		// 창 핸들을 직접 비교하는 쪽이 확실하고 호출 비용도 작다.
+		bool HasConsoleFocus() const;
+
 	private:
 		// 키 상태를 관리할 배열.
 		KeyState keyStates[KeyCount] = { };
