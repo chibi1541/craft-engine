@@ -3,18 +3,33 @@
 #include "Utils/EngineMacro.h"
 #include "Core/CraftObject.h"
 #include "Asset/PrimaryDataAsset.h"
+#include <atomic>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <typeindex>
 #include <unordered_map>
+#include <vector>
 
 NAME_SPACE_BEGIN(Craft)
+
+// 잡 큐는 순전히 구현 세부라 헤더에 노출하지 않는다.
+// ObjectPool<Job>이 dllexport 클래스 템플릿이라, 이 헤더를 쓰는 클라이언트 모듈에서
+// JobQueue::DoAsync가 인스턴스화되면 정적 멤버를 다시 정의하려 들어 링크가 깨진다.
+// 큐를 만지는 코드는 전부 AssetManager.cpp 안에만 둔다.
+class JobQueue;
 
 // 타입 T를 파일 경로로부터 만들어내는 방법.
 // AssetManager::RegisterLoader<T>()로 등록해두면 Load<T>()가 캐시 미스일 때 이걸로 채운다.
 template<typename T>
 using AssetLoaderFunc = std::function<std::shared_ptr<const T>(const WCHAR* path)>;
+
+// 비동기 로드가 끝났을 때 메인 쓰레드에서 불리는 완료 콜백.
+// 로드에 실패하면 asset이 nullptr로 들어온다(파일이 없거나 파싱 실패).
+template<typename T>
+using AssetLoadedDelegate = std::function<void(std::shared_ptr<const T> asset)>;
 
 // 파일 경로로 애셋을 로드/캐싱하고, 오래 참조되지 않은 애셋은 자동으로 내리는 매니저.
 // 언리얼의 Primary Asset / Asset Manager를 참고한 구조.
@@ -46,6 +61,11 @@ class CRAFT_API AssetManager
 
 		std::unordered_map<std::wstring, Entry> entries;
 		AssetLoaderFunc<T> loader;
+
+		// 로드 진행 중인 경로 -> 완료를 기다리는 콜백들.
+		// 같은 파일을 여럿이 동시에 요청해도 워커에는 한 번만 넘긴다.
+		// 메인 쓰레드에서만 접근하므로 락이 필요 없다.
+		std::unordered_map<std::wstring, std::vector<AssetLoadedDelegate<T>>> pending;
 
 		virtual void Tick(float deltaTime, float unloadThreshold) override
 		{
@@ -119,8 +139,84 @@ public:
 		return entry.asset;
 	}
 
-	// 매 프레임 호출. 유휴 시간을 누적하고, 조건을 만족한 항목을 정리한다.
+	// 비동기 로드. 파일 읽기와 파싱은 워커 쓰레드가 하고,
+	// onLoaded는 항상 메인 쓰레드의 Tick() 안에서 불린다.
+	//
+	// 캐시에 이미 있어도 즉시 호출하지 않고 완료 큐를 거친다.
+	// "콜백은 언제나 Tick 시점"이라는 타이밍이 한결같아야
+	// 호출부가 캐시 히트/미스를 나눠서 생각하지 않아도 된다.
+	//
+	// 주의 - onLoaded가 불릴 때 요청자가 이미 파괴됐을 수 있다.
+	// 콜백에서 액터/컴포넌트를 만진다면 weak_ptr로 생존을 확인할 것.
+	template<typename T>
+	void LoadAsync(const WCHAR* path, AssetLoadedDelegate<T> onLoaded)
+	{
+		TypedCache<T>& cache = GetOrCreateCache<T>();
+
+		const std::wstring key(path);
+
+		// 1) 캐시 히트 - 파싱 없이 완료 큐로 바로 넘긴다.
+		auto it = cache.entries.find(key);
+
+		if (it != cache.entries.end())
+		{
+			std::shared_ptr<const T> asset = it->second.asset;
+
+			EnqueueCompletionJob([onLoaded, asset]() { onLoaded(asset); });
+
+			return;
+		}
+
+		// 2) 이미 같은 경로를 로드 중이면 콜백만 덧붙인다(중복 파싱 방지).
+		auto pendingIt = cache.pending.find(key);
+
+		if (pendingIt != cache.pending.end())
+		{
+			pendingIt->second.push_back(onLoaded);
+
+			return;
+		}
+
+		// 3) 새 요청. 로더가 없으면 코드 실수다.
+		ASSERT_CRASH(cache.loader);
+
+		cache.pending[key].push_back(onLoaded);
+
+		// 워커가 캐시를 만지지 않도록 로더를 값으로 복사해서 넘긴다.
+		AssetLoaderFunc<T> loader = cache.loader;
+		AssetManager* self = this;
+
+		EnqueueLoadJob([self, loader, key]()
+			{
+				// ===== 여기부터 워커 쓰레드 =====
+				// 엔진 자료구조는 하나도 건드리지 않는다. 파싱해서 결과만 만든다.
+				std::shared_ptr<const T> asset = nullptr;
+
+				// FileUtils::ReadFile 안의 fs::file_size가 예외를 던지는데
+				// 엔진은 예외를 쓰지 않으므로 워커에서 던지면 그대로 terminate다.
+				// 그래서 읽기 전에 존재를 확인한다(ec 버전이라 이 호출 자체는 안 던진다).
+				std::error_code ec;
+
+				if (std::filesystem::exists(key, ec) && !ec)
+				{
+					asset = loader(key.c_str());
+				}
+				// ===== 워커 쓰레드 끝 =====
+
+				// 캐시 삽입과 콜백 호출은 메인에게 맡긴다.
+				self->EnqueueCompletionJob([self, key, asset]() { self->OnAssetLoaded<T>(key, asset); });
+			});
+	}
+
+	// 매 프레임 호출. 완료된 로드를 처리하고, 유휴 시간을 누적해 정리한다.
 	void Tick(float deltaTime);
+
+	// 워커 쓰레드를 멈춘다. Engine::Shutdown()에서 Join() 전에 반드시 부를 것.
+	// 이걸 안 부르면 워커가 무한 루프라 Join()에서 영영 안 돌아온다.
+	void StopWorkers();
+
+	// 워커 쓰레드가 도는 루프. ThreadManager::Launch()에 넘긴다.
+	void WorkerLoop();
 
 	// 유휴 판정 임계값(초). 기본 30초.
 	inline void SetUnloadThreshold(float seconds) { unloadThreshold = seconds; }
@@ -161,6 +257,45 @@ public:
 	}
 
 private:
+	// 큐에 잡을 넣는 통로. 정의가 .cpp에 있어서 JobQueue 타입이 헤더로 새지 않는다.
+	void EnqueueLoadJob(std::function<void()> job);
+	void EnqueueCompletionJob(std::function<void()> job);
+
+	// 워커가 만들어 온 결과를 캐시에 넣고 대기 중인 콜백들을 부른다.
+	// 완료 큐를 통해서만 불리므로 항상 메인 쓰레드다.
+	template<typename T>
+	void OnAssetLoaded(const std::wstring& key, std::shared_ptr<const T> asset)
+	{
+		TypedCache<T>& cache = GetOrCreateCache<T>();
+
+		// 성공한 경우에만 캐시에 넣는다.
+		// 실패(nullptr)를 캐시에 넣으면 파일을 고쳐도 계속 실패가 반환된다.
+		if (nullptr != asset)
+		{
+			typename TypedCache<T>::Entry entry;
+			entry.asset = asset;
+
+			cache.entries.emplace(key, entry);
+		}
+
+		auto pendingIt = cache.pending.find(key);
+
+		if (pendingIt == cache.pending.end())
+		{
+			return;
+		}
+
+		// 콜백이 같은 경로를 다시 LoadAsync해도 안전하도록
+		// 목록을 꺼내고 맵에서 먼저 지운 뒤에 호출한다.
+		std::vector<AssetLoadedDelegate<T>> delegates = std::move(pendingIt->second);
+		cache.pending.erase(pendingIt);
+
+		for (AssetLoadedDelegate<T>& onLoaded : delegates)
+		{
+			onLoaded(asset);
+		}
+	}
+
 	// 템플릿 멤버 함수라 정의를 여기(헤더)에 둬야 함 - cpp로 분리 불가.
 	template<typename T>
 	TypedCache<T>& GetOrCreateCache()
@@ -191,6 +326,15 @@ private:
 	// 이름 -> 로드 완료된 프라이머리 애셋.
 	// caches(TypedCache)와 완전히 분리된 별도 저장소라서 Tick()의 유휴 정리 대상이 아니다.
 	std::unordered_map<std::string, std::shared_ptr<PrimaryDataAsset>> primaryAssets;
+
+	// 메인 -> 워커. 파일 읽기 + 파싱 잡이 쌓인다.
+	std::shared_ptr<JobQueue> loadQueue;
+
+	// 워커 -> 메인. 캐시 삽입 + 콜백 호출 잡이 쌓이고, Tick()에서 비운다.
+	std::shared_ptr<JobQueue> completionQueue;
+
+	// 워커 루프 종료 신호.
+	std::atomic<bool> isRunning = true;
 
 	static AssetManager* instance;
 };

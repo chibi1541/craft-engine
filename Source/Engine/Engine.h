@@ -7,6 +7,7 @@ class Input;
 class InputSystem;
 class Renderer;
 class AssetManager;
+class ThreadManager;
 
 
 // dll에서 외부 모듈로 노출시키겠다는 키워드
@@ -124,6 +125,10 @@ protected:
 
 	// 애셋 로드/캐싱/유휴 언로드를 담당
 	std::unique_ptr<AssetManager> assetManager;
+
+	// 애셋 파싱용 워커 쓰레드를 들고 있다.
+	// assetManager보다 먼저 정리돼야 워커가 죽은 매니저를 만지지 않는다.
+	std::unique_ptr<ThreadManager> threadManager;
 
 	// 화면에 프레임 수를 표시할지 여부
 	bool showFps = true;

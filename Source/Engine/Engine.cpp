@@ -8,6 +8,8 @@
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
 #include "Asset/SpriteAnimationLoader.h"
+#include "Math/SymbolPalette.h"
+#include "Thread/ThreadManager.h"
 
 #include <memory>
 
@@ -45,10 +47,32 @@ Engine::Engine()
 		{
 			return std::make_shared<const AnimationClipSet>(SpriteAnimationLoader::LoadFromFile(path));
 		});
+
+	// 워커를 띄우기 전에 메인에서 한 번 만들어 둔다.
+	// 애셋 로드 경로에서 유일한 지연 초기화 정적(함수 안 static)이라,
+	// 여기서 미리 만들어 두면 여러 워커가 동시에 처음 만나는 상황 자체가 없어진다.
+	SymbolPalette::GetTable();
+
+	// 애셋 파싱용 워커 기동.
+	// 지금 애셋 수로는 2개면 충분하고, 늘려도 디스크가 병목이라 이득이 없다.
+	threadManager = std::make_unique<ThreadManager>();
+
+	for (int i = 0; i < 2; ++i)
+	{
+		threadManager->Launch([this]() { assetManager->WorkerLoop(); });
+	}
 }
 
 Engine::~Engine()
 {
+	// 멤버는 선언 역순으로 파괴된다. threadManager가 assetManager보다 먼저 죽는데,
+	// ThreadManager 소멸자가 Join()을 부르므로 여기서 워커를 먼저 멈춰두지 않으면
+	// 무한 루프인 워커를 기다리며 그대로 멈춰 선다.
+	//
+	// Run()이 정상 종료되면 Shutdown()에서 이미 처리되지만,
+	// Run()을 안 타고 파괴되는 경우까지 덮기 위해 여기서도 보장한다.
+	Shutdown();
+
 	instance = nullptr;
 }
 
@@ -302,7 +326,18 @@ void Engine::SavePreviousInputState()
 
 void Engine::Shutdown()
 {
+	// 순서가 중요하다.
+	// 워커 루프는 무한 루프라서 정지 신호를 먼저 주지 않으면
+	// Join()이 영영 돌아오지 않는다(= 종료가 안 됨).
+	if (assetManager)
+	{
+		assetManager->StopWorkers();
+	}
 
+	if (threadManager)
+	{
+		threadManager->Join();
+	}
 }
 
 void Engine::LoadEngineSetting()

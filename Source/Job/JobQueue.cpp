@@ -22,22 +22,20 @@ void JobQueue::Execute()
 {
 	// job을 소비
 	// 한번에 작업이 몰리는 상황이 발생하면 증분적으로 처리하는 로직을 추가
-	while (true)
+
+	vector<shared_ptr<Job>> jobs;
+	// 여기서 lock을 걸로 queue에 있는 모든 일감을 복사해 옴
+	_jobs.PopAll(OUT jobs);
+
+	const int32 jobCount = static_cast<int32>(jobs.size());
+	for (int32 id = 0; id < jobCount; ++id)
 	{
-		vector<shared_ptr<Job>> jobs;
-		// 여기서 lock을 걸로 queue에 있는 모든 일감을 복사해 옴
-		_jobs.PopAll(OUT jobs);
-
-		const int32 jobCount = static_cast<int32>(jobs.size());
-		for (int32 id = 0; id < jobCount; ++id)
-		{
-			jobs[id]->Execute();
-		}
-
-		// 처리한 만큼 JobCount를 줄임
-		// 일단 혹시 일감이 늘어도 여기서 마무리 -> 다음 Tick에 소모
-		_jobCount.fetch_sub(jobCount);
+		jobs[id]->Execute();
 	}
+
+	// 처리한 만큼 JobCount를 줄임
+	// 일단 혹시 일감이 늘어도 여기서 마무리 -> 다음 Tick에 소모
+	_jobCount.fetch_sub(jobCount);
 }
 
 

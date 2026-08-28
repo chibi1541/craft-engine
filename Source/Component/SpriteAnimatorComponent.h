@@ -9,6 +9,7 @@
 #include "Asset/AssetTypes.h"
 #include <string>
 #include <memory>
+#include <functional>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -35,6 +36,16 @@ public:
 	// XML 애니메이션 정의(*.anim.xml)를 읽어서 클립을 한꺼번에 등록한다.
 	// 등록된 클립 수를 반환한다(0이면 파일이 없거나 파싱 실패).
 	int LoadClipsFromFile(const WCHAR* path);
+
+	// 위와 같지만 파싱을 워커 쓰레드에 맡긴다. 호출은 즉시 반환된다.
+	// 등록된 클립 수가 onLoaded로 넘어온다(0이면 파일이 없거나 파싱 실패).
+	//
+	// onLoaded는 메인 쓰레드의 AssetManager::Tick() 안에서 불린다.
+	// 상태 머신은 클립 이름을 검증하므로 onLoaded 안에서 이어 읽어야 한다.
+	//
+	// 주의 - 콜백이 도착하기 전에 소유 액터가 파괴될 수 있다.
+	// 콜백 쪽에서 weak_ptr로 생존을 확인할 것.
+	void LoadClipsFromFileAsync(const WCHAR* path, std::function<void(int)> onLoaded);
 
 	// XML 상태 머신 정의(*.fsm.xml)를 읽어서 레이어와 상태 머신을 채운다.
 	// 채운 레이어 수를 반환한다.

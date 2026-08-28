@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "AssetManager.h"
+#include "Job/JobQueue.h"
 #include "Xml/XmlParser.h"
 #include "Utils/FileUtils.h"
 #include <filesystem>
@@ -39,11 +40,48 @@ AssetManager::AssetManager()
 {
 	ASSERT_CRASH(!instance);
 	instance = this;
+
+	// JobQueue가 enable_shared_from_this를 상속해서 shared_ptr로 만들어야 한다.
+	loadQueue = std::make_shared<JobQueue>();
+	completionQueue = std::make_shared<JobQueue>();
 }
 
 AssetManager::~AssetManager()
 {
+	// 워커가 살아있는 채로 파괴되면 워커의 잡이 죽은 this를 만진다.
+	// Engine::Shutdown()이 먼저 멈추지만, 그 경로를 안 타는 경우를 위한 안전망이다.
+	StopWorkers();
+
 	instance = nullptr;
+}
+
+void AssetManager::EnqueueLoadJob(std::function<void()> job)
+{
+	loadQueue->DoAsync(std::move(job));
+}
+
+void AssetManager::EnqueueCompletionJob(std::function<void()> job)
+{
+	completionQueue->DoAsync(std::move(job));
+}
+
+void AssetManager::StopWorkers()
+{
+	isRunning.store(false);
+}
+
+void AssetManager::WorkerLoop()
+{
+	while (isRunning.load())
+	{
+		// 쌓인 파싱 잡을 전부 소비하고 돌아온다.
+		loadQueue->Execute();
+
+		// Lock이 condition_variable이 아니라 스핀락이라
+		// 빈 큐를 계속 돌리면 코어 하나를 그냥 태운다.
+		// 애셋 로딩에서 1ms 지연은 의미가 없고 그동안 CPU는 0%다.
+		::Sleep(1);
+	}
 }
 
 AssetManager& AssetManager::Get()
@@ -54,6 +92,13 @@ AssetManager& AssetManager::Get()
 
 void AssetManager::Tick(float deltaTime)
 {
+	// 워커가 넘긴 완료 잡을 여기서 처리한다.
+	// = 캐시 삽입 + 완료 콜백 호출. 전부 메인 쓰레드다.
+	//
+	// 유휴 정리보다 먼저 돌려야 이번 프레임에 도착한 애셋이
+	// 곧바로 유휴 판정을 받는 일이 없다.
+	completionQueue->Execute();
+
 	for (auto& pair : caches)
 	{
 		pair.second->Tick(deltaTime, unloadThreshold);

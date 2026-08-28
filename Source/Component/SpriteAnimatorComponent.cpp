@@ -68,6 +68,33 @@ int SpriteAnimatorComponent::LoadClipsFromFile(const WCHAR* path)
 	return static_cast<int>(loadedClips->size());
 }
 
+void SpriteAnimatorComponent::LoadClipsFromFileAsync(const WCHAR* path, std::function<void(int)> onLoaded)
+{
+	// this를 그대로 캡처한다. 컴포넌트는 소유 액터보다 오래 살지 않으므로
+	// 생존 판단은 액터를 들고 있는 호출부의 weak_ptr에 맡기는 게 맞다.
+	// (여기서 컴포넌트 수명을 따로 잡으면 이미 죽은 액터의 컴포넌트를 되살리게 된다)
+	AssetManager::Get().LoadAsync<AnimationClipSet>(path,
+		[this, onLoaded](std::shared_ptr<const AnimationClipSet> clips)
+		{
+			if (nullptr == clips)
+			{
+				onLoaded(0);
+
+				return;
+			}
+
+			// 이 참조가 살아있어야 AssetManager 캐시가 "사용 중"으로 본다(동기판과 같은 계약).
+			loadedClips = clips;
+
+			for (const std::shared_ptr<const AnimationClip>& clip : *loadedClips)
+			{
+				animInstance.AddClip(clip);
+			}
+
+			onLoaded(static_cast<int>(loadedClips->size()));
+		});
+}
+
 int SpriteAnimatorComponent::LoadStateMachineFromFile(const WCHAR* path)
 {
 	return AnimStateMachineLoader::LoadIntoInstance(path, animInstance);
