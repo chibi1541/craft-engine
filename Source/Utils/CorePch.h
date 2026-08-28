@@ -16,3 +16,5 @@
 #include "Xml/XmlParser.h"
 #include "Math/Vector2.h"
 #include "Utils/json.hpp"
+#include "Thread/Lock.h"
+#include "Memory/ObjectPool.h"

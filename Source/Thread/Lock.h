@@ -43,7 +43,7 @@ private:
 };
 
 // Lock의 사용은 RAII 방식으로
-class ReadLockGuard
+class CRAFT_API ReadLockGuard
 {
 public:
 	ReadLockGuard(Lock& lock, const char* name) : _lock(lock), _name(name)
@@ -62,7 +62,7 @@ private:
 	const char* _name;
 };
 
-class WriteLockGuard
+class CRAFT_API WriteLockGuard
 {
 public:
 	WriteLockGuard(Lock& lock, const char* name) : _lock(lock), _name(name)

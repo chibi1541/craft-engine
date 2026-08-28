@@ -99,13 +99,22 @@
     <ClCompile Include="Source\Thread\ThreadManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Job.cpp">
+    <ClCompile Include="Source\Job\Job.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Thread\Lock.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Thread\TLS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Job\JobQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Job\LockQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Memory\MemoryPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -275,13 +284,25 @@
     <ClInclude Include="Source\Thread\ThreadManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Job.h">
+    <ClInclude Include="Source\Job\Job.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Thread\Lock.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Thread\TLS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Job\JobQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Job\LockQueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Memory\MemoryPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Memory\ObjectPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
