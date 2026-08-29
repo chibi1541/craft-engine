@@ -170,6 +170,45 @@ void Renderer::SubmitPixels(
 	});
 }
 
+void Renderer::SubmitWorld(
+	const std::string& image,
+	const Vector2& worldPosition,
+	Color color,
+	int sortingOrder,
+	std::optional<Color> backgroundColor,
+	std::optional<Rect> clipRect)
+{
+	// 변환은 여기 진입부에서 한 번. clipRect도 position과 같은 공간이므로 함께 옮긴다.
+	std::optional<Rect> screenClip = clipRect;
+
+	if (screenClip.has_value())
+	{
+		screenClip = Rect(screenClip->position - viewOrigin, screenClip->size);
+	}
+
+	Submit(image, worldPosition - viewOrigin, color, sortingOrder, backgroundColor, screenClip);
+}
+
+void Renderer::SubmitPixelsWorld(
+	const std::string& pixelMap,
+	const std::unordered_map<char, Color>& palette,
+	const Vector2& worldPosition,
+	int sortingOrder,
+	char transparentSymbol,
+	int scaleX,
+	int scaleY,
+	std::optional<Rect> clipRect)
+{
+	std::optional<Rect> screenClip = clipRect;
+
+	if (screenClip.has_value())
+	{
+		screenClip = Rect(screenClip->position - viewOrigin, screenClip->size);
+	}
+
+	SubmitPixels(pixelMap, palette, worldPosition - viewOrigin, sortingOrder, transparentSymbol, scaleX, scaleY, screenClip);
+}
+
 void Renderer::Draw()
 {
 	// 화면(이미지/프레임) 지우기.

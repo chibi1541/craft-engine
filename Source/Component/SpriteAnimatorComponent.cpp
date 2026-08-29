@@ -43,7 +43,7 @@ void SpriteAnimatorComponent::Draw()
 	const Vector2 pivotCell = animInstance.GetCurrentPivotCell();
 	const Vector2 pivotOffset(pivotCell.x * scaleX, pivotCell.y * scaleY);
 
-	Renderer::Get().SubmitPixels(
+	Renderer::Get().SubmitPixelsWorld(
 		pixelMap,
 		SymbolPalette::GetTable(),
 		ownerActor->GetPosition() + offset - pivotOffset,

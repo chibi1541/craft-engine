@@ -4,6 +4,7 @@
 #include "Input/Input.h"
 #include "Input/InputSystem.h"
 #include "Render/Renderer.h"
+#include "Camera/CameraManager.h"
 #include "Math/Palette.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
@@ -40,6 +41,10 @@ Engine::Engine()
 
 	// 랜더러 객체 생성
 	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
+
+	// 카메라 매니저 생성.
+	// 뷰 크기로 렌더러가 실제로 잡은 화면 크기를 쓰므로 renderer 다음이어야 한다.
+	cameraManager = std::make_unique<CameraManager>(renderer->GetScreenSize());
 
 	// UI 시스템 생성.
 	// 위젯 배치가 화면 크기를 필요로 하므로 renderer 다음이어야 한다.
@@ -158,6 +163,12 @@ void Engine::Run()
 					if (uiSystem)
 					{
 						uiSystem->ClearNonPersistent();
+					}
+
+					// 등록 카메라와 활성 카메라를 비운다(viewOrigin은 유지).
+					if (cameraManager)
+					{
+						cameraManager->Reset();
 					}
 
 					mainLevel.reset();
@@ -305,6 +316,13 @@ void Engine::Tick(float deltaTime)
 		mainLevel->Tick(deltaTime);
 	}
 
+	// 액터가 움직인 뒤 카메라가 따라가고, 그 결과를 같은 프레임의 UI가 읽는다.
+	// 그래서 mainLevel->Tick 뒤, uiSystem->Tick 앞이다.
+	if (cameraManager)
+	{
+		cameraManager->Tick(deltaTime);
+	}
+
 	// UI는 레벨과 무관하게 돈다. 레벨 없이 메뉴만 떠 있는 상태가 있기 때문이다.
 	// 레벨 다음인 이유는 게임플레이가 이번 프레임에 바꾼 값(체력 등)을
 	// UI가 같은 프레임에 읽게 하기 위해서다.
@@ -316,6 +334,13 @@ void Engine::Tick(float deltaTime)
 
 void Engine::Draw()
 {
+	// 이번 프레임의 뷰 원점을 확정한다.
+	// 반드시 액터/UI 제출보다 먼저 - World 제출은 이 값을 빼서 화면 좌표를 만든다.
+	if (renderer && cameraManager)
+	{
+		renderer->SetViewOrigin(cameraManager->GetViewOrigin());
+	}
+
 	// 여기서 레벨에 속해있는 액터 객체가 rendercommand에 드로우콜을 등록
 	if (mainLevel)
 	{

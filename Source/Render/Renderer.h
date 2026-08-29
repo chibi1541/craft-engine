@@ -146,6 +146,44 @@ public:
 		std::optional<Rect> clipRect = std::nullopt
 	);
 
+	// 월드 좌표를 받아 뷰 원점을 빼서 그리는 진입점.
+	//
+	// 회전이 없으면 월드->화면 변환은 순수 평행이동이라 DrawRenderQueue의
+	// 소스->화면 1:1 선형성을 깨지 않는다. 그래서 Submit 진입부에서 한 번 옮기면
+	// RenderCommand와 DrawRenderQueue는 손대지 않아도 된다.
+	//
+	// 트레일링 enum이 아니라 별도 함수인 이유:
+	//  - UI 안전성이 기본 인자값 하나에 걸리지 않는다(UI는 계속 Submit을 쓴다)
+	//  - 호출부는 Submit -> SubmitWorld 한 단어 교체로 끝난다
+	//  - 월드/화면 축이 함수 이름으로 드러나 grep이 쉽다
+	//
+	// clipRect는 worldPosition과 같은 좌표 공간(월드)으로 해석되어 함께 이동한다.
+	// World 제출은 Draw 페이즈에서만 - viewOrigin은 Engine::Draw 진입부에서 확정된다.
+	void SubmitWorld(
+		const std::string& image,
+		const Vector2& worldPosition,
+		Color color = Color::White,
+		int sortingOrder = 0,
+		std::optional<Color> backgroundColor = std::nullopt,
+		std::optional<Rect> clipRect = std::nullopt
+	);
+
+	// SubmitPixels의 월드 좌표판. 규칙은 SubmitWorld와 같다.
+	void SubmitPixelsWorld(
+		const std::string& pixelMap,
+		const std::unordered_map<char, Color>& palette,
+		const Vector2& worldPosition,
+		int sortingOrder = 0,
+		char transparentSymbol = '.',
+		int scaleX = 1,
+		int scaleY = 1,
+		std::optional<Rect> clipRect = std::nullopt
+	);
+
+	// 뷰 좌상단의 월드 좌표. Engine::Draw 진입부에서 CameraManager가 확정한다.
+	void SetViewOrigin(const Vector2& origin) { viewOrigin = origin; }
+	Vector2 GetViewOrigin() const { return viewOrigin; }
+
 	// 실제로 잡힌 화면 크기(콘솔 셀 개수).
 	//
 	// Engine의 설정값(Setting.txt)이 아니라 ScreenBuffer가 클램프한 뒤의 값이다.
@@ -186,6 +224,10 @@ private:
 
 	// 화면 크기
 	Vector2 screenSize;
+
+	// 뷰 좌상단의 월드 좌표. World 진입점이 이 값을 빼서 화면 좌표로 옮긴다.
+	// Zero면 월드 좌표 == 화면 좌표라 기존 동작과 동일하다.
+	Vector2 viewOrigin = Vector2::Zero;
 
 	// 화면 지우기 색(배경색)
 	Color clearColor = Color::Black;

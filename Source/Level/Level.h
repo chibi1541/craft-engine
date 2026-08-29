@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Core/CraftObject.h"
+#include "Math/Rect.h"
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -97,12 +98,23 @@ public:
 	// getter/setter
 	inline bool HasInitialized() const { return hasInitialized; }
 
+	// 카메라 클램프에 쓰이는 월드 경계(콘솔 셀 단위).
+	//
+	// 비어 있으면(기본값) 클램프하지 않는다 = 무한 월드, 기존 동작 유지.
+	// CameraManager가 레벨 교체 후 이 값을 읽으므로, 경계는 Level 생성자나
+	// OnInitialized 초반에 설정하는 것을 규약으로 한다.
+	inline Rect GetWorldBounds() const { return worldBounds; }
+	inline void SetWorldBounds(const Rect& bounds) { worldBounds = bounds; }
+
 protected:
 	void ProcessAddAndDestoryActors();
 
 protected:
 
 	bool hasInitialized = false;
+
+	// 월드 경계. 기본값은 비어 있음(size 0) = 클램프 없음.
+	Rect worldBounds;
 
 	// 레벨에 배치된 모든 액터
 	std::vector<std::shared_ptr<Actor>> actorList;

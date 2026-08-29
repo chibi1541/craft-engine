@@ -122,6 +122,8 @@
     <ClCompile Include="Source\Asset\Image.cpp" />
     <ClCompile Include="Source\Asset\Sprite.cpp" />
     <ClCompile Include="Source\Asset\SpriteAnimationLoader.cpp" />
+    <ClCompile Include="Source\Camera\CameraComponent.cpp" />
+    <ClCompile Include="Source\Camera\CameraManager.cpp" />
     <ClCompile Include="Source\Component\ActorComponent.cpp" />
     <ClCompile Include="Source\Component\SpriteAnimatorComponent.cpp" />
     <ClCompile Include="Source\Actor\Actor.cpp" />
@@ -172,6 +174,8 @@
     <ClInclude Include="Source\Asset\Image.h" />
     <ClInclude Include="Source\Asset\Sprite.h" />
     <ClInclude Include="Source\Asset\SpriteAnimationLoader.h" />
+    <ClInclude Include="Source\Camera\CameraComponent.h" />
+    <ClInclude Include="Source\Camera\CameraManager.h" />
     <ClInclude Include="Source\Component\ActorComponent.h" />
     <ClInclude Include="Source\Component\SpriteAnimatorComponent.h" />
     <ClInclude Include="Source\Actor\Actor.h" />

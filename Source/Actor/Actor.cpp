@@ -59,7 +59,8 @@ void Actor::Draw()
 	// 스프라이트만 쓰는 액터는 image가 비어있다.
 	if (!image.empty())
 	{
-		Renderer::Get().Submit(image, position, color, sortingOrder);
+		// 액터는 월드 객체이므로 월드 좌표로 제출한다. 카메라가 화면 좌표로 옮긴다.
+		Renderer::Get().SubmitWorld(image, position, color, sortingOrder);
 	}
 
 	// 그리기를 담당하는 컴포넌트(예: SpriteAnimatorComponent)에 전달.

@@ -29,7 +29,10 @@ ScreenBuffer::ScreenBuffer(const Vector2& screenSize)
 	fontInfo.dwFontSize = { 8, 8 };                  // 가로 8px, 세로 8px (정사각 셀)
 	fontInfo.FontFamily = FF_DONTCARE;
 	fontInfo.FontWeight = FW_NORMAL;
-	wcscpy_s(fontInfo.FaceName, L"Terminal");
+	wcscpy_s(fontInfo.FaceName, L"Consolas");
+
+	COORD largest = GetLargestConsoleWindowSize(buffer);
+
 
 	BOOL result = SetCurrentConsoleFontEx(buffer, FALSE, &fontInfo);
 	ASSERT_CRASH(result == TRUE);
@@ -41,7 +44,6 @@ ScreenBuffer::ScreenBuffer(const Vector2& screenSize)
 	// 요청한 크기가 현재 폰트 기준으로 화면을 넘으면 들어가는 크기로 줄인다.
 	// (여기서 안 줄이면 아래 SetConsoleWindowInfo가 실패한다)
 	// 화면 해상도/배율/폰트에 따라 달라지는 값이라, 설정값을 그대로 믿으면 안 됨.
-	COORD largest = GetLargestConsoleWindowSize(buffer);
 
 	if (size.x > largest.X)
 	{

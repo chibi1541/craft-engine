@@ -6,6 +6,7 @@ class Level;
 class Input;
 class InputSystem;
 class Renderer;
+class CameraManager;
 class AssetManager;
 class ThreadManager;
 
@@ -136,6 +137,13 @@ protected:
 	std::unique_ptr<InputSystem> inputSystem;
 
 	std::unique_ptr<Renderer> renderer;
+
+	// 활성 카메라를 추적하고 매 프레임 뷰 원점을 계산한다.
+	//
+	// renderer 다음에 두는 이유가 앞뒤로 하나씩 있다.
+	//  - 생성: renderer 다음이어야 실제로 잡힌 화면 크기(뷰 크기)를 알 수 있다.
+	//  - 파괴: uiSystem보다 나중에 죽어야, 먼저 죽는 uiSystem이 카메라를 안전하게 참조한다.
+	std::unique_ptr<CameraManager> cameraManager;
 
 	// 화면에 올라간 위젯들의 갱신/배치/그리기를 담당.
 	//
