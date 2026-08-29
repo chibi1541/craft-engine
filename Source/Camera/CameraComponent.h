@@ -33,6 +33,15 @@ public:
 	// 뷰 중심이 놓일 월드 좌표 = 오너 액터 위치 + offset.
 	Vector2 GetViewCenter() const;
 
+	// 뷰 회전(90° 단위). 콘솔은 셀 격자라 정지 각도는 항상 k*90°다.
+	//
+	// blendTime > 0 이면 그 시간 동안 선형 보간해서 돈다(연출). 0이면 즉시 스냅.
+	// 이 컴포넌트가 현재 활성 카메라면 매니저에 바로 반영되고,
+	// 비활성이면 값만 저장됐다가 활성화될 때 매니저가 읽는다.
+	void SetViewQuarterTurns(int turns, float blendTime = 0.0f);
+	void AddViewQuarterTurns(int delta, float blendTime = 0.0f);
+	inline int GetViewQuarterTurns() const { return viewQuarterTurns; }
+
 	// getter/setter
 	inline Vector2 GetOffset() const { return offset; }
 	inline void SetOffset(const Vector2& newOffset) { offset = newOffset; }
@@ -47,6 +56,9 @@ private:
 
 	// 활성 카메라가 없으면 자동으로 활성화될지 여부.
 	bool autoActivate = true;
+
+	// 목표(정지) 회전. 0~3. 보간 진행 상태는 CameraManager가 소유한다.
+	int viewQuarterTurns = 0;
 
 	// 매니저에 이미 등록됐는지. 중복 등록 방지용.
 	bool registered = false;

@@ -30,6 +30,28 @@ void CameraComponent::BeginPlay()
 	}
 }
 
+void CameraComponent::SetViewQuarterTurns(int turns, float blendTime)
+{
+	viewQuarterTurns = ((turns % 4) + 4) % 4;
+
+	// 활성 카메라일 때만 매니저를 구동한다(SetActiveCamera가 push인 것과 같은 패턴).
+	// 비활성이면 값만 저장 - 활성화 시점에 CameraManager가 GetViewQuarterTurns()를 읽는다.
+	if (CameraManager::HasInstance())
+	{
+		CameraManager& manager = CameraManager::Get();
+
+		if (manager.GetActiveCamera().get() == this)
+		{
+			manager.BlendViewRotationTo(viewQuarterTurns, blendTime);
+		}
+	}
+}
+
+void CameraComponent::AddViewQuarterTurns(int delta, float blendTime)
+{
+	SetViewQuarterTurns(viewQuarterTurns + delta, blendTime);
+}
+
 Vector2 CameraComponent::GetViewCenter() const
 {
 	// ownership - 액터가 사라졌으면 기준점을 알 수 없다.

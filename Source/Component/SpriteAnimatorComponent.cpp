@@ -43,14 +43,19 @@ void SpriteAnimatorComponent::Draw()
 	const Vector2 pivotCell = animInstance.GetCurrentPivotCell();
 	const Vector2 pivotOffset(pivotCell.x * scaleX, pivotCell.y * scaleY);
 
+	// 월드 앵커는 액터 위치(+오프셋)까지만. 피벗 오프셋은 뷰 변환 뒤에
+	// 화면 공간에서 빼야 뷰가 회전해도 스프라이트 발밑이 앵커에 붙어 있다.
+	// (앵커까지 함께 회전시키면 90°에서 발밑이 옆으로 샌다 - 빌보드)
 	Renderer::Get().SubmitPixelsWorld(
 		pixelMap,
 		SymbolPalette::GetTable(),
-		ownerActor->GetPosition() + offset - pivotOffset,
+		ownerActor->GetPosition() + offset,
 		ownerActor->GetSortingOrder(),
 		SymbolPalette::TransparentSymbol,
 		scaleX,
-		scaleY
+		scaleY,
+		std::nullopt,
+		Vector2(-pivotOffset.x, -pivotOffset.y)
 	);
 }
 

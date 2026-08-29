@@ -189,6 +189,7 @@
     <ClInclude Include="Source\Math\Color.h" />
     <ClInclude Include="Source\Math\Palette.h" />
     <ClInclude Include="Source\Math\Rect.h" />
+    <ClInclude Include="Source\Math\ViewTransform.h" />
     <ClInclude Include="Source\Math\SymbolPalette.h" />
     <ClInclude Include="Source\Math\Vector2.h" />
     <ClInclude Include="Source\pch.h" />

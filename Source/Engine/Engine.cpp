@@ -334,11 +334,22 @@ void Engine::Tick(float deltaTime)
 
 void Engine::Draw()
 {
-	// 이번 프레임의 뷰 원점을 확정한다.
-	// 반드시 액터/UI 제출보다 먼저 - World 제출은 이 값을 빼서 화면 좌표를 만든다.
+	// 이번 프레임의 뷰를 확정한다.
+	// 반드시 액터/UI 제출보다 먼저 - World 제출이 이 값으로 월드->화면 변환을 한다.
 	if (renderer && cameraManager)
 	{
-		renderer->SetViewOrigin(cameraManager->GetViewOrigin());
+		if (cameraManager->IsRotationBlending())
+		{
+			renderer->SetViewInterpolated(
+				cameraManager->GetViewCenterWorld(),
+				cameraManager->GetViewAngleDegrees());
+		}
+		else
+		{
+			renderer->SetView(
+				cameraManager->GetViewCenterWorld(),
+				cameraManager->GetViewQuarterTurns());
+		}
 	}
 
 	// 여기서 레벨에 속해있는 액터 객체가 rendercommand에 드로우콜을 등록

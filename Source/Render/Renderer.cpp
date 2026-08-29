@@ -1,6 +1,9 @@
 ﻿#include "pch.h"
 #include "Renderer.h"
 #include "ScreenBuffer.h"
+#include "Math/ViewTransform.h"
+
+#include <cmath>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -69,6 +72,10 @@ Renderer::Renderer(const Vector2& screenSize) : screenSize(screenSize)
 
 	// 생성 후 프레임 지우기
 	frame->Clear(this->screenSize, clearColor);
+
+	// 뷰 중심 기본값 = 화면 중앙. 활성 카메라가 없으면 이 값이 유지되어
+	// ViewWorldToScreen(world) == world 가 된다(회전 이전 동작과 동일).
+	viewCenterWorld = Vector2(this->screenSize.x / 2, this->screenSize.y / 2);
 
 	currentBufferIndex = 0;
 	// 화면에 0번 콘솔 버퍼 활성화
@@ -170,6 +177,47 @@ void Renderer::SubmitPixels(
 	});
 }
 
+Vector2 Renderer::ViewToScreen(const Vector2& world) const
+{
+	const Vector2 half(screenSize.x / 2, screenSize.y / 2);
+
+	return viewInterpolated
+		? ViewWorldToScreenF(world, viewCenterWorld, half, viewCos, viewSin)
+		: ViewWorldToScreen(world, viewCenterWorld, half, viewQuarterTurns);
+}
+
+std::optional<Rect> Renderer::ViewClipToScreen(const std::optional<Rect>& worldClip) const
+{
+	if (!worldClip.has_value())
+	{
+		return std::nullopt;
+	}
+
+	const Vector2 half(screenSize.x / 2, screenSize.y / 2);
+
+	return viewInterpolated
+		? ViewWorldRectToScreenAABBF(*worldClip, viewCenterWorld, half, viewCos, viewSin)
+		: ViewWorldRectToScreenAABB(*worldClip, viewCenterWorld, half, viewQuarterTurns);
+}
+
+void Renderer::SetView(const Vector2& centerWorld, int quarterTurns)
+{
+	viewCenterWorld = centerWorld;
+	viewQuarterTurns = ((quarterTurns % 4) + 4) % 4;
+	viewInterpolated = false;
+}
+
+void Renderer::SetViewInterpolated(const Vector2& centerWorld, float angleDegrees)
+{
+	viewCenterWorld = centerWorld;
+	viewInterpolated = true;
+
+	// 프레임당 1회만 계산해서 매 제출마다 다시 부르지 않는다.
+	const float radians = angleDegrees * (3.14159265358979323846f / 180.0f);
+	viewCos = ::cosf(radians);
+	viewSin = ::sinf(radians);
+}
+
 void Renderer::SubmitWorld(
 	const std::string& image,
 	const Vector2& worldPosition,
@@ -179,14 +227,7 @@ void Renderer::SubmitWorld(
 	std::optional<Rect> clipRect)
 {
 	// 변환은 여기 진입부에서 한 번. clipRect도 position과 같은 공간이므로 함께 옮긴다.
-	std::optional<Rect> screenClip = clipRect;
-
-	if (screenClip.has_value())
-	{
-		screenClip = Rect(screenClip->position - viewOrigin, screenClip->size);
-	}
-
-	Submit(image, worldPosition - viewOrigin, color, sortingOrder, backgroundColor, screenClip);
+	Submit(image, ViewToScreen(worldPosition), color, sortingOrder, backgroundColor, ViewClipToScreen(clipRect));
 }
 
 void Renderer::SubmitPixelsWorld(
@@ -197,16 +238,12 @@ void Renderer::SubmitPixelsWorld(
 	char transparentSymbol,
 	int scaleX,
 	int scaleY,
-	std::optional<Rect> clipRect)
+	std::optional<Rect> clipRect,
+	const Vector2& screenPixelOffset)
 {
-	std::optional<Rect> screenClip = clipRect;
-
-	if (screenClip.has_value())
-	{
-		screenClip = Rect(screenClip->position - viewOrigin, screenClip->size);
-	}
-
-	SubmitPixels(pixelMap, palette, worldPosition - viewOrigin, sortingOrder, transparentSymbol, scaleX, scaleY, screenClip);
+	// 피벗 오프셋은 뷰 변환 뒤에 화면 공간에서 더한다(빌보드 - 회전에 따라 돌면 안 됨).
+	SubmitPixels(pixelMap, palette, ViewToScreen(worldPosition) + screenPixelOffset,
+		sortingOrder, transparentSymbol, scaleX, scaleY, ViewClipToScreen(clipRect));
 }
 
 void Renderer::Draw()
