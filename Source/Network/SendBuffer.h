@@ -24,7 +24,7 @@ public:
 	int32			BufferRemainSize() {return _writePos - _readPos;}
 	void			PushSendQueue(void* data, int32 size);
 	void			ProcessBuffer(int32 size);
-	void			ConsumeBuffer();
+	int32			ConsumeBuffer();
 
 private:
 	void			ResetQueue();

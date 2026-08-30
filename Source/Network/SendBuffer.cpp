@@ -82,27 +82,26 @@ void SendBuffer::ProcessBuffer(int32 size)
 	ResetBuffer();
 }
 
-void SendBuffer::ConsumeBuffer()
+int32 SendBuffer::ConsumeBuffer()
 {
 	WRITE_LOCK;
 
 	int32 remainQSize = RemainSize();
 
-	// queue에 새 요청이 없다면 얼리 아웃
-	if(remainQSize == 0)
+	if(remainQSize != 0)
 	{
-		return;
+		if (BufferCapacity() < remainQSize)
+			ResetBuffer();
+
+		int32 procSize = std::min(BufferCapacity(), remainQSize);
+		::memcpy(&_buffer[_writePos], &_queue[_consumePos], static_cast<size_t>(procSize));
+		_writePos += procSize;
+		_consumePos += procSize;
+
+		ResetQueue();
 	}
 
-	if (BufferCapacity() < remainQSize)
-		ResetBuffer();
-
-	int32 procSize = std::min(BufferCapacity(), remainQSize);
-	::memcpy(&_buffer[_writePos], &_queue[_consumePos], static_cast<size_t>(procSize));
-	_writePos += procSize;
-	_consumePos += procSize;
-
-	ResetQueue();
+	return BufferRemainSize();
 }
 
 BufferChunk::BufferChunk()

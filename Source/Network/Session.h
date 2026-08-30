@@ -11,6 +11,8 @@ class Session
 {
 	enum { RECV_BUFFER_SIZE = 0x1000, };
 
+	friend class Service;
+
 public:
 	Session(NetAddress address);
 	virtual ~Session();
@@ -18,7 +20,9 @@ public:
 public:
 	bool				Connect();
 	void				Disconnect(const WCHAR* cause);
-	void				Send(void* buffer, int32 size);
+	// send queue에 있던 요청을 sendBuffer로 옮기고 그 사이즈를 반환
+	int32				ReadyForSend();
+	void				RegisterSend(void* buffer, int32 size);
 
 public:
 	/* 정보 관련 */
@@ -27,15 +31,11 @@ public:
 	SOCKET		GetSocket() { return _socket; }
 	bool		IsConnected() { return _connected; }
 
+	void HandleError(int32 errorCode);
+
 private:
-	//void RegisterRecv();
-	//void RegisterSend();
-
-	//void ProcessRecv(int32 numOfBytes);
-	//void ProcessSend(int32 numOfBytes);
-
-	//void HandleError(int32 errorCode);
-
+	void ProcessRecv(int32 numOfBytes);
+	void ProcessSend(int32 numOfBytes);
 
 protected:
 	// 필요한 상황에 컨텐츠 코드에서 오버라이드 할 함수

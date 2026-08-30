@@ -69,10 +69,44 @@ void Session::Disconnect(const WCHAR* cause)
 	// 종료처리는 Recv에서 0을 받으면서 완료
 }
 
-void Session::Send(void* buffer, int32 size)
+int32 Session::ReadyForSend()
 {
-	_sendBuffer->PushSendQueue(buffer, size);
+	return _sendBuffer->ConsumeBuffer();
 }
 
+void Session::RegisterSend(void* buffer, int32 size)
+{
+	_sendBuffer->PushSendQueue(buffer,size);
+}
+
+void Session::HandleError(int32 errorCode)
+{
+	// TODO : 소켓 에러 처리
+	switch (errorCode)
+	{
+	case WSAECONNRESET:
+	case WSAECONNABORTED:
+		Disconnect(L"HandleError");
+		break;
+	default:
+		//LOG_WARN(L"Session HandleError : %d", errorCode);
+		break;
+	}
+
+}
+
+void Session::ProcessRecv(int32 numOfBytes)
+{
+	_recvBuffer->OnRead(numOfBytes);
+
+	OnRecv(_recvBuffer->ReadPos(), numOfBytes);
+}
+
+void Session::ProcessSend(int32 numOfBytes)
+{
+	_sendBuffer->ProcessBuffer(numOfBytes);
+
+	OnSend(numOfBytes);
+}
 
 NAME_SPACE_END
