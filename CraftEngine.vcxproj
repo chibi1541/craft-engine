@@ -104,6 +104,11 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Source\Network\SocketUtils.cpp" />
+    <ClCompile Include="Source\Network\Session.cpp" />
+    <ClCompile Include="Source\Network\RecvBuffer.cpp" />
+    <ClCompile Include="Source\Network\SendBuffer.cpp" />
+    <ClCompile Include="Source\Network\NetAddress.cpp" />
     <ClCompile Include="Source\Memory\MemoryPool.cpp" />
     <ClCompile Include="Source\Job\LockQueue.cpp" />
     <ClCompile Include="Source\Job\JobQueue.cpp" />
@@ -154,6 +159,11 @@
     <ClCompile Include="Source\Thread\TLS.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Network\SocketUtils.h" />
+    <ClInclude Include="Source\Network\Session.h" />
+    <ClInclude Include="Source\Network\RecvBuffer.h" />
+    <ClInclude Include="Source\Network\SendBuffer.h" />
+    <ClInclude Include="Source\Network\NetAddress.h" />
     <ClInclude Include="Source\Memory\MemoryPool.h" />
     <ClInclude Include="Source\Job\LockQueue.h" />
     <ClInclude Include="Source\Job\JobQueue.h" />

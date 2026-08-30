@@ -48,6 +48,8 @@ void ThreadManager::InitTLS()
 {
 	static atomic<uint32> SThreadId = 1;
 	LThreadId = SThreadId.fetch_add(1);
+
+	LBufferChunk.Reset();
 }
 
 void ThreadManager::DestroyTLS()

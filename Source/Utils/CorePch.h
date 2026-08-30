@@ -18,3 +18,9 @@
 #include "Utils/json.hpp"
 #include "Thread/Lock.h"
 #include "Memory/ObjectPool.h"
+
+// winsock
+#include <winsock2.h>
+#include <mswsock.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
