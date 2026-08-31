@@ -1,5 +1,4 @@
 ﻿#include "pch.h"
-#include "TLS.h"
 #include "ThreadManager.h"
 
 NAME_SPACE_BEGIN(Craft)
@@ -56,6 +55,16 @@ void ThreadManager::InitTLS()
 void ThreadManager::DestroyTLS()
 {
 	delete LBufferChunk;
+}
+
+BYTE* ThreadManager::OpenBufferChunk(int32 size)
+{
+	return LBufferChunk->Open(size);
+}
+
+void ThreadManager::CloseBufferChunk(int32 size)
+{
+	LBufferChunk->Close(size);
 }
 
 NAME_SPACE_END

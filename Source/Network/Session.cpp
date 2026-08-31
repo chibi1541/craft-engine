@@ -10,6 +10,8 @@ NAME_SPACE_BEGIN(Craft)
 
 Session::Session(NetAddress address) : _netAddress(address)
 {
+	SocketUtils::Init();
+
 	_socket = SocketUtils::CreateSocket();
 	_recvBuffer = std::make_unique<RecvBuffer>(RECV_BUFFER_SIZE);
 	_sendBuffer = std::make_unique<SendBuffer>();
@@ -38,11 +40,9 @@ bool Session::Connect()
 	if (SOCKET_ERROR == ::connect(_socket, reinterpret_cast<SOCKADDR*>(&sockAddr), sizeof(sockAddr)))
 	{
 		int32 errorCode = ::WSAGetLastError();
-		if (errorCode == WSAEWOULDBLOCK)
-		{
-			// TODO : Debug Output
-			return false;
-		}
+		HandleError(errorCode);
+
+		return false;
 	}
 
 	_connected.store(true);
@@ -97,9 +97,11 @@ void Session::HandleError(int32 errorCode)
 
 void Session::ProcessRecv(int32 numOfBytes)
 {
-	_recvBuffer->OnRead(numOfBytes);
+	_recvBuffer->OnWrite(numOfBytes);
 
-	OnRecv(_recvBuffer->ReadPos(), numOfBytes);
+	int32 readSize = OnRecv(_recvBuffer->ReadPos(), numOfBytes);
+
+	_recvBuffer->OnRead(readSize);
 }
 
 void Session::ProcessSend(int32 numOfBytes)

@@ -3,6 +3,7 @@
 #include "Session.h"
 #include "RecvBuffer.h"
 #include "SendBuffer.h"
+#include "SocketUtils.h"
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -83,8 +84,6 @@ bool ServerService::Start()
 {
 	if (CanStart() == false)
 		return false;
-
-	ASSERT_CRASH(_session != nullptr);
 
 	if(_session->Connect() == false)
 		return false;
