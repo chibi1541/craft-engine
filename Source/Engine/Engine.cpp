@@ -11,6 +11,7 @@
 #include "Asset/SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
 #include "Thread/ThreadManager.h"
+#include "Job/JobQueue.h"
 #include "UI/UISystem.h"
 
 #include <memory>
@@ -23,6 +24,12 @@ Engine::Engine()
 {
 	ASSERT_CRASH(instance == nullptr);
 	instance = this;
+
+	// 다른 쓰레드 -> 게임 쓰레드 작업 큐.
+	//
+	// 생성자 맨 앞이다. 아래에서 애셋 워커가 뜨고, 컨텐츠 코드가 네트워크 쓰레드를
+	// 띄우기도 한다. 그 어느 쪽보다 먼저 존재해야 첫 잡을 흘리지 않는다.
+	gameThreadQueue = std::make_shared<JobQueue>();
 
 	// 엔진 설정 로드
 	LoadEngineSetting();
@@ -136,7 +143,17 @@ void Engine::Run()
 			// 아마 플레그를 둬서 한번만 처리하는 방식으로 구현하겠지...
 			BeginPlay();
 
-			// 3. 입력 이벤트 전달.
+			// 3. 다른 쓰레드에서 넘어온 작업 처리(주로 서버에서 도착한 패킷).
+			//
+			// DispatchInput 앞인 것이 중요하다.
+			// 서버가 확정한 상태를 먼저 반영하고, 그 위에 이번 프레임의 로컬 입력을 얹는다.
+			// 순서가 뒤집히면 이번 프레임의 예측이 지난 프레임 상태 위에 얹히고,
+			// 서버 보정이 항상 한 프레임 늦게 적용된다.
+			//
+			// BeginPlay 뒤인 이유 - 이번 프레임에 막 올라온 액터도 잡의 대상이 될 수 있다.
+			PumpGameThreadJobs();
+
+			// 4. 입력 이벤트 전달.
 			// BeginPlay에서 막 등록된 InputComponent도 이번 프레임부터 입력을 받는다.
 			DispatchInput();
 
@@ -213,6 +230,28 @@ void Engine::Quit()
 {
 	// 엔진 종료 플래그 true
 	isQuit = true;
+}
+
+void Engine::RunOnGameThread(std::function<void()> job)
+{
+	// 어느 쓰레드에서 불려도 안전하다. LockQueue가 락을 잡는다.
+	// 밀어 넣기만 하고 바로 돌아온다 - 미는 쓰레드가 소비까지 하지 않는다.
+	gameThreadQueue->DoAsync(std::move(job));
+}
+
+void Engine::AddShutdownHandler(std::function<void()> handler)
+{
+	shutdownHandlers.emplace_back(std::move(handler));
+}
+
+void Engine::PumpGameThreadJobs()
+{
+	// 쌓인 잡을 전부 소비한다.
+	//
+	// 잡 안에서 다시 RunOnGameThread를 불러도 이번 프레임에 다시 돌지 않는다.
+	// Execute()가 PopAll로 스냅샷을 뜬 뒤 그것만 돌기 때문에 새 잡은 다음 프레임 몫이다.
+	// (한 프레임 안에서 무한히 도는 일이 없다)
+	gameThreadQueue->Execute();
 }
 
 Engine& Engine::Get()
@@ -421,6 +460,16 @@ void Engine::Shutdown()
 	if (assetManager)
 	{
 		assetManager->StopWorkers();
+	}
+
+	// 엔진이 만들지 않은 쓰레드에 정지 신호를 보낸다(네트워크 쓰레드 등).
+	// 애셋 워커와 같은 이유로 Join()보다 먼저다.
+	for (const std::function<void()>& handler : shutdownHandlers)
+	{
+		if (handler)
+		{
+			handler();
+		}
 	}
 
 	if (threadManager)

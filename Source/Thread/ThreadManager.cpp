@@ -57,6 +57,11 @@ void ThreadManager::DestroyTLS()
 	delete LBufferChunk;
 }
 
+uint32 ThreadManager::GetThreadID() const
+{
+	return LThreadId;
+}
+
 BYTE* ThreadManager::OpenBufferChunk(int32 size)
 {
 	return LBufferChunk->Open(size);

@@ -27,7 +27,13 @@ void Service::HandleRecv()
 	int32 recvLen = ::recv(_session->GetSocket(), reinterpret_cast<char*>(_session->_recvBuffer->WritePos()), _session->_recvBuffer->FreeSize(), 0);
 	if (recvLen == 0)
 	{
-		// 연결 해제
+		// 상대가 연결을 끊었다.
+		//
+		// 여기서 루프를 끝내지 않으면 안 된다.
+		// EOF 상태의 소켓은 select에서 계속 readable로 잡히기 때문에,
+		// 그냥 return하면 매 루프 recv가 0을 돌려주며 코어 하나를 그대로 태운다.
+		_isRunning.store(false);
+
 		_session->OnDisconnected();
 		return;
 	}
@@ -37,6 +43,16 @@ void Service::HandleRecv()
 		int32 errorCode = ::WSAGetLastError();
 
 		_session->HandleError(errorCode);
+
+		// 연결이 끊어진 에러였다면(HandleError가 Disconnect를 부른 경우) 루프를 끝낸다.
+		//
+		// 상대가 정상 종료(FIN)하면 recv가 0을 주지만, 프로세스가 그냥 죽으면
+		// RST가 날아와 여기로 온다. 이 경우를 처리하지 않으면 select가 계속
+		// readable을 돌려주고 recv가 계속 실패하면서 코어 하나를 그대로 태운다.
+		if (_session->IsConnected() == false)
+		{
+			_isRunning.store(false);
+		}
 
 		return;
 	}
@@ -57,6 +73,12 @@ void Service::HandleSend()
 		int32 errorCode = ::WSAGetLastError();
 
 		_session->HandleError(errorCode);
+
+		// HandleRecv와 같은 이유다. 끊어진 연결에 계속 send를 시도하며 돌지 않는다.
+		if (_session->IsConnected() == false)
+		{
+			_isRunning.store(false);
+		}
 
 		return;
 	}
@@ -88,14 +110,14 @@ bool ServerService::Start()
 	if(_session->Connect() == false)
 		return false;
 
-	_isRunning = true;
+	_isRunning.store(true);
 	return true;
 }
 
 void ServerService::Run()
 {
-	// TODO : 루프 종료 조건 설정
-	while(_isRunning)
+	// Stop()이 _isRunning을 내리면 최대 10us 안에 빠져나온다.
+	while (_isRunning.load())
 	{
 		// SocketSet 초기화
 		FD_ZERO(&_readSet);
@@ -110,10 +132,13 @@ void ServerService::Run()
 
 		// select 함수 마지막에 들어가는 옵션
 		// 이 옵션을 설정해 주면 select가 무한 대기를 하지 않고 설정된 시간 초 만큼만 대기
-		timeval timeout;
+		// 반드시 0으로 초기화하고 시작한다.
+		// tv_sec을 비워두면 초기화되지 않은 스택 값이 그대로 들어가서
+		// select가 수천 초를 블로킹할 수 있다. 그러면 Stop()을 불러도 쓰레드가 안 죽는다.
+		timeval timeout = {};
 		// 시간(초 단위)
-		//timeout.tv_sec;
-		// 시간(ms 단위)
+		timeout.tv_sec = 0;
+		// 시간(us 단위)
 		timeout.tv_usec = 10;
 
 		int32 retVal = ::select(0, &_readSet, &_writeSet, nullptr, &timeout);
@@ -122,7 +147,7 @@ void ServerService::Run()
 			int32 error = ::WSAGetLastError();
 			// TODO : 에러 코드 처리
 
-			_isRunning = false;
+			_isRunning.store(false);
 			break;
 
 		}
@@ -135,7 +160,7 @@ void ServerService::Run()
 		if (FD_ISSET(_session->GetSocket(), &_readSet))
 			HandleRecv();
 
-		if (_isRunning && FD_ISSET(_session->GetSocket(), &_writeSet))
+		if (_isRunning.load() && FD_ISSET(_session->GetSocket(), &_writeSet))
 			HandleSend();
 
 	}
