@@ -314,6 +314,15 @@
     <ClInclude Include="Source\Asset\AnimationDataAsset.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Asset\LevelDataAsset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Asset\LevelMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Level\TileMapLevel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Input\InputComponent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -446,6 +455,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Asset\AnimationDataAsset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Asset\LevelDataAsset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Asset\LevelMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Level\TileMapLevel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

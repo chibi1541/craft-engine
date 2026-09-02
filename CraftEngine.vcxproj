@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -122,6 +122,8 @@
     <ClCompile Include="Source\Animation\AnimStateMachine.cpp" />
     <ClCompile Include="Source\Asset\AnimationClip.cpp" />
     <ClCompile Include="Source\Asset\AnimationDataAsset.cpp" />
+    <ClCompile Include="Source\Asset\LevelDataAsset.cpp" />
+    <ClCompile Include="Source\Asset\LevelMap.cpp" />
     <ClCompile Include="Source\Asset\AnimStateMachineLoader.cpp" />
     <ClCompile Include="Source\Asset\AssetManager.cpp" />
     <ClCompile Include="Source\Asset\PrimaryDataAsset.cpp" />
@@ -140,6 +142,7 @@
     <ClCompile Include="Source\Input\InputHandler.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level\Level.cpp" />
+    <ClCompile Include="Source\Level\TileMapLevel.cpp" />
     <ClCompile Include="Source\Math\Palette.cpp" />
     <ClCompile Include="Source\Math\SymbolPalette.cpp" />
     <ClCompile Include="Source\Math\Vector2.cpp" />
@@ -179,6 +182,8 @@
     <ClInclude Include="Source\Animation\AnimStateMachine.h" />
     <ClInclude Include="Source\Asset\AnimationClip.h" />
     <ClInclude Include="Source\Asset\AnimationDataAsset.h" />
+    <ClInclude Include="Source\Asset\LevelDataAsset.h" />
+    <ClInclude Include="Source\Asset\LevelMap.h" />
     <ClInclude Include="Source\Asset\AnimStateMachineLoader.h" />
     <ClInclude Include="Source\Asset\AssetManager.h" />
     <ClInclude Include="Source\Asset\AssetTypes.h" />
@@ -198,6 +203,7 @@
     <ClInclude Include="Source\Input\InputHandler.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level\Level.h" />
+    <ClInclude Include="Source\Level\TileMapLevel.h" />
     <ClInclude Include="Source\Math\Color.h" />
     <ClInclude Include="Source\Math\Palette.h" />
     <ClInclude Include="Source\Math\Rect.h" />

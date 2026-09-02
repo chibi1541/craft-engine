@@ -7,6 +7,7 @@
 #include "Camera/CameraManager.h"
 #include "Math/Palette.h"
 #include "Asset/AssetManager.h"
+#include "Asset/LevelMap.h"
 #include "Asset/AssetTypes.h"
 #include "Asset/SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
@@ -63,6 +64,11 @@ Engine::Engine()
 		[](const WCHAR* path)
 		{
 			return std::make_shared<const AnimationClipSet>(SpriteAnimationLoader::LoadFromFile(path));
+		});
+	assetManager->RegisterLoader<LevelMap>(
+		[](const WCHAR* path)
+		{
+			return std::make_shared<const LevelMap>(LevelMap::LoadFromFile(path));
 		});
 
 	// 워커를 띄우기 전에 메인에서 한 번 만들어 둔다.
