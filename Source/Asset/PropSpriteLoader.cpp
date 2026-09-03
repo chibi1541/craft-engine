@@ -31,6 +31,59 @@ namespace
 		return true;
 	}
 
+	// Left <-> Right 폴백에서 뒤집을 축. XML의 mirror 속성에서 온다.
+	enum class EMirrorMode
+	{
+		None,
+		X,      // 가로만. 세로축이 "높이"인 그림(서 있는 울타리/기둥/묘비).
+		XY,     // 둘 다. 세로축이 "벽 방향"인 그림(문처럼 개구부 전체를 담은 것).
+	};
+
+	EMirrorMode ParseMirrorMode(const std::string& text)
+	{
+		if (text == "none")
+		{
+			return EMirrorMode::None;
+		}
+
+		if (text == "xy")
+		{
+			return EMirrorMode::XY;
+		}
+
+		// 빈 문자열과 "x" 모두 기본값. 대부분의 프롭이 서 있는 그림이다.
+		return EMirrorMode::X;
+	}
+
+	// 픽셀맵을 뒤집는다.
+	//
+	// Sprite가 "width칸 + '\n'"이 height번 반복되는 정규화 형태를 보장하므로
+	// (Asset/Sprite.h의 저장 형식 불변식) 행 단위로 재조립하면 된다.
+	Sprite MirrorSprite(const Sprite& source, bool flipX, bool flipY)
+	{
+		const int width = source.GetWidth();
+		const int height = source.GetHeight();
+
+		std::string flipped;
+		flipped.reserve(source.GetPixelMap().size());
+
+		for (int row = 0; row < height; ++row)
+		{
+			const int sourceRow = flipY ? (height - 1 - row) : row;
+
+			for (int column = 0; column < width; ++column)
+			{
+				const int sourceColumn = flipX ? (width - 1 - column) : column;
+
+				flipped.push_back(source.GetPixel(sourceRow, sourceColumn));
+			}
+
+			flipped.push_back('\n');
+		}
+
+		return Sprite(flipped);
+	}
+
 	// 폴백 상대. 반대편을 먼저 본다.
 	EFacing GetFallbackPartner(EFacing facing)
 	{
@@ -70,6 +123,11 @@ PropSpriteSet PropSpriteLoader::LoadFromFile(const WCHAR* path)
 		return props;
 	}
 
+	// 이 파일의 아트가 그려진 타일 격자. 기본 피벗이 여기 걸린다.
+	const int tileSize = root.GetInt32Attr(L"tileSize", DefaultTileSize);
+
+	ASSERT_CRASH(tileSize > 0);
+
 	for (XmlNode& propNode : root.FindChildren(L"Prop"))
 	{
 		const std::string name = FileUtils::Convert(propNode.GetStringAttr(L"name", L""));
@@ -90,7 +148,7 @@ PropSpriteSet PropSpriteLoader::LoadFromFile(const WCHAR* path)
 		PropSprite prop;
 		prop.name = name;
 
-		if (!LoadProp(propNode, prop))
+		if (!LoadProp(propNode, tileSize, prop))
 		{
 			continue;
 		}
@@ -101,16 +159,23 @@ PropSpriteSet PropSpriteLoader::LoadFromFile(const WCHAR* path)
 	return props;
 }
 
-bool PropSpriteLoader::LoadProp(XmlNode& propNode, OUT PropSprite& outProp)
+bool PropSpriteLoader::LoadProp(XmlNode& propNode, int tileSize, OUT PropSprite& outProp)
 {
-	// tileSpan은 정사각 타일 영역의 한 변이다. 0 이하는 데이터 실수.
+	// tileSpan은 타일 영역의 "벽 방향" 길이다(깊이는 언제나 1타일). 0 이하는 데이터 실수.
 	const int tileSpan = propNode.GetInt32Attr(L"tileSpan", 1);
 
 	ASSERT_CRASH(tileSpan > 0);
 
 	outProp.tileSpan = tileSpan;
+	outProp.tileSize = tileSize;
 
 	bool hasSlot[FacingCount] = { false, false, false, false };
+
+	// 슬롯별 반전 방식. 폴백할 때 "원본" 슬롯의 값을 쓴다.
+	EMirrorMode mirrorModes[FacingCount] =
+	{
+		EMirrorMode::X, EMirrorMode::X, EMirrorMode::X, EMirrorMode::X
+	};
 
 	for (XmlNode& spriteNode : propNode.FindChildren(L"Sprite"))
 	{
@@ -157,13 +222,16 @@ bool PropSpriteLoader::LoadProp(XmlNode& propNode, OUT PropSprite& outProp)
 			ASSERT_CRASH(sprite.GetHeight() == declaredHeight);
 		}
 
-		// pivot="x,y". 생략하면 슬롯별 기본값(정면은 발밑, 측면은 이미지 중앙).
+		mirrorModes[slot] = ParseMirrorMode(
+			FileUtils::Convert(spriteNode.GetStringAttr(L"mirror", L"")));
+
+		// pivot="x,y". 생략하면 슬롯과 무관한 기본값.
 		const std::string pivotText = FileUtils::Convert(spriteNode.GetStringAttr(L"pivot", L""));
 
 		if (pivotText.empty())
 		{
 			outProp.pivotX[slot] = PropSprite::GetDefaultPivotX(sprite.GetWidth());
-			outProp.pivotY[slot] = PropSprite::GetDefaultPivotY(sprite.GetHeight(), facing);
+			outProp.pivotY[slot] = PropSprite::GetDefaultPivotY(sprite.GetHeight(), tileSize);
 		}
 		else
 		{
@@ -193,12 +261,15 @@ bool PropSpriteLoader::LoadProp(XmlNode& propNode, OUT PropSprite& outProp)
 		return false;
 	}
 
-	ResolveFallbacks(outProp, hasSlot);
+	ResolveFallbacks(outProp, hasSlot, mirrorModes);
 
 	return true;
 }
 
-void PropSpriteLoader::ResolveFallbacks(OUT PropSprite& outProp, const bool (&hasSlot)[FacingCount])
+void PropSpriteLoader::ResolveFallbacks(
+	OUT PropSprite& outProp,
+	const bool (&hasSlot)[FacingCount],
+	const void* mirrorModesRaw)
 {
 	// 채워진 슬롯 아무거나 하나. 마지막 폴백에 쓴다.
 	int anyFilled = -1;
@@ -215,6 +286,8 @@ void PropSpriteLoader::ResolveFallbacks(OUT PropSprite& outProp, const bool (&ha
 	// 호출부가 "하나라도 있다"를 이미 확인했다.
 	ASSERT_CRASH(anyFilled >= 0);
 
+	const EMirrorMode* mirrorModes = static_cast<const EMirrorMode*>(mirrorModesRaw);
+
 	for (int index = 0; index < FacingCount; ++index)
 	{
 		if (hasSlot[index])
@@ -227,34 +300,43 @@ void PropSpriteLoader::ResolveFallbacks(OUT PropSprite& outProp, const bool (&ha
 		const int partner = ToFacingIndex(GetFallbackPartner(static_cast<EFacing>(index)));
 		const int source = hasSlot[partner] ? partner : anyFilled;
 
-		outProp.sprites[index] = outProp.sprites[source];
-
-		// 피벗은 원본 슬롯의 값을 그대로 쓰지 않는다.
+		// 좌우끼리 물려받을 때는 그림을 뒤집는다.
 		//
-		// 정면 슬롯에서 측면 슬롯으로 복사하면(FRONT만 있는 프롭) 피벗 규칙이
-		// 슬롯마다 다르기 때문에 그림이 타일 영역 밖으로 내려간다.
-		// 그림은 물려받되 피벗은 "이 슬롯"의 규칙으로 다시 계산한다.
+		// 측면 아트가 한 장뿐인데 그대로 복사하면 서쪽 벽과 동쪽 벽이 같은 그림이 되어
+		// 반대편에서 봐도 거울이 아니다. 실제 아트가 전부 좌우 비대칭이라 눈에 띈다.
 		//
-		// 단, 원본 슬롯이 XML에서 피벗을 직접 지정했다면 그건 작가의 의도이므로
-		// 기본값으로 되돌리면 안 된다. 그래서 원본이 기본값을 쓴 경우에만 다시 계산한다.
-		const Sprite& sprite = outProp.sprites[index];
-		const EFacing sourceFacing = static_cast<EFacing>(source);
-		const EFacing targetFacing = static_cast<EFacing>(index);
+		// ★ 어느 축을 뒤집을지는 데이터가 정한다 (@mirror) ★
+		// Left <-> Right는 거울이 아니라 수직축 180도 회전이라 월드 두 축이 모두 뒤집힌다.
+		// 이미지에서 어느 축이 뒤집히는지는 그 그림의 세로축이 무엇을 뜻하느냐에 달렸다 -
+		// 서 있는 울타리는 세로축이 높이라 가로만, 문처럼 개구부 전체를 담은 그림은
+		// 세로축이 벽 방향이라 둘 다 뒤집어야 한다. 그림만 봐서는 알 수 없어서
+		// 규칙으로 유도하지 않고 작가가 적는다.
+		//
+		// 앞뒤(Up <-> Down)는 뒤집지 않는다. 뒷면 아트가 없어 정면으로 때우는 것뿐이다.
+		// 축이 다른 폴백(정면 -> 측면)도 마찬가지다.
+		const bool sideToSide =
+			IsSideFacing(static_cast<EFacing>(index)) && IsSideFacing(static_cast<EFacing>(source));
 
-		const bool sourceUsedDefault =
-			outProp.pivotX[source] == PropSprite::GetDefaultPivotX(sprite.GetWidth())
-			&& outProp.pivotY[source] == PropSprite::GetDefaultPivotY(sprite.GetHeight(), sourceFacing);
+		const EMirrorMode mode = sideToSide ? mirrorModes[source] : EMirrorMode::None;
 
-		if (sourceUsedDefault)
-		{
-			outProp.pivotX[index] = PropSprite::GetDefaultPivotX(sprite.GetWidth());
-			outProp.pivotY[index] = PropSprite::GetDefaultPivotY(sprite.GetHeight(), targetFacing);
-		}
-		else
-		{
-			outProp.pivotX[index] = outProp.pivotX[source];
-			outProp.pivotY[index] = outProp.pivotY[source];
-		}
+		const bool flipX = (mode == EMirrorMode::X || mode == EMirrorMode::XY);
+		const bool flipY = (mode == EMirrorMode::XY);
+
+		outProp.sprites[index] = (flipX || flipY)
+			? MirrorSprite(outProp.sprites[source], flipX, flipY)
+			: outProp.sprites[source];
+
+		// 피벗은 원본 슬롯 값을 물려받되, 뒤집은 축은 같이 뒤집어야 그림이 안 어긋난다.
+		const int width = outProp.sprites[index].GetWidth();
+		const int height = outProp.sprites[index].GetHeight();
+
+		outProp.pivotX[index] = flipX
+			? (width - 1) - outProp.pivotX[source]
+			: outProp.pivotX[source];
+
+		outProp.pivotY[index] = flipY
+			? (height - 1) - outProp.pivotY[source]
+			: outProp.pivotY[source];
 	}
 }
 

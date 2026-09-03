@@ -3,7 +3,10 @@
 
 #include "Asset/AssetManager.h"
 #include "Asset/LevelDataAsset.h"
+#include "Actor/StaticPropActor.h"
+#include "Asset/LevelLayout.h"
 #include "Asset/LevelMap.h"
+#include "Asset/PropDataAsset.h"
 #include "Camera/CameraManager.h"
 #include "Math/SymbolPalette.h"
 #include "Math/ViewTransform.h"
@@ -63,6 +66,143 @@ void TileMapLevel::OnInitialized()
 
 			self->OnLevelMapLoaded(std::move(loaded));
 		});
+
+	// 배치는 선택 항목이다. 없으면 지형만 있는 레벨.
+	const std::wstring& layoutPath = levelData->FindLayoutPath(levelName);
+
+	if (layoutPath.empty())
+	{
+		return;
+	}
+
+	AssetManager::Get().LoadAsync<LevelLayout>(layoutPath.c_str(),
+		[weakSelf](std::shared_ptr<const LevelLayout> loaded)
+		{
+			const std::shared_ptr<TileMapLevel> self = Cast<TileMapLevel>(weakSelf.lock());
+
+			if (nullptr == self)
+			{
+				return;
+			}
+
+			self->OnLayoutLoaded(std::move(loaded));
+		});
+}
+
+void TileMapLevel::OnLayoutLoaded(std::shared_ptr<const LevelLayout> loaded)
+{
+	if (nullptr == loaded || loaded->IsEmpty())
+	{
+		::OutputDebugStringA("[TileMapLevel] level layout is empty\n");
+		return;
+	}
+
+	levelLayout = std::move(loaded);
+
+	// 배치 격자를 레벨에 반영한다. 0이면 데이터가 값을 안 정한 것이니 기본값을 유지한다.
+	if (levelLayout->GetTileSize() > 0)
+	{
+		SetTileSize(levelLayout->GetTileSize());
+	}
+
+	// 스프라이트 묶음은 여기서 한 번만 로드한다.
+	// 액터마다 걸면 같은 파일에 콜백만 배치 개수만큼 쌓인다.
+	const std::shared_ptr<const PropDataAsset> propData =
+		AssetManager::Get().GetPrimaryAsset<PropDataAsset>("PropData");
+
+	if (nullptr == propData)
+	{
+		::OutputDebugStringA("[TileMapLevel] PropData primary asset not found\n");
+		return;
+	}
+
+	const std::wstring& propSetPath = propData->FindPropSetPath(levelLayout->GetPropSetName());
+
+	if (propSetPath.empty())
+	{
+		::OutputDebugStringA("[TileMapLevel] prop set name not found in PropData\n");
+		return;
+	}
+
+	std::weak_ptr<Level> weakSelf = weak_from_this();
+
+	AssetManager::Get().LoadAsync<PropSpriteSet>(propSetPath.c_str(),
+		[weakSelf](std::shared_ptr<const PropSpriteSet> loaded)
+		{
+			const std::shared_ptr<TileMapLevel> self = Cast<TileMapLevel>(weakSelf.lock());
+
+			if (nullptr == self)
+			{
+				return;
+			}
+
+			self->OnPropSetLoaded(std::move(loaded));
+		});
+}
+
+void TileMapLevel::OnPropSetLoaded(std::shared_ptr<const PropSpriteSet> loaded)
+{
+	if (nullptr == loaded || loaded->empty())
+	{
+		::OutputDebugStringA("[TileMapLevel] prop sprite set is empty\n");
+		return;
+	}
+
+	propSet = std::move(loaded);
+
+	if (nullptr == levelLayout)
+	{
+		return;
+	}
+
+	for (const LevelLayout::Placement& placement : levelLayout->GetPlacements())
+	{
+		SpawnProp(placement.name, placement.tileX, placement.tileY, placement.facing);
+	}
+}
+
+std::shared_ptr<StaticPropActor> TileMapLevel::SpawnProp(
+	const std::string& propName, int tileX, int tileY, EFacing facing)
+{
+	if (nullptr == propSet)
+	{
+		return nullptr;
+	}
+
+	auto it = propSet->find(propName);
+
+	if (it == propSet->end())
+	{
+		// 이름 오타. 이 항목만 건너뛰고 나머지는 세운다.
+		::OutputDebugStringA("[TileMapLevel] layout refers to an unknown prop name\n");
+		return nullptr;
+	}
+
+	const int tileSize = GetTileSize();
+
+	// 아트가 그려진 격자와 레벨의 격자가 다르면 피벗이 통째로 어긋난다.
+	// 화면만 봐서는 원인을 못 찾으므로 여기서 잡는다.
+	ASSERT_CRASH(it->second.GetTileSize() == tileSize);
+
+	const int spanInCells = it->second.GetTileSpan() * tileSize;
+
+	// 타일 좌상단 -> 기준점. StaticPropActor::GetTileBounds의 역산이다.
+	//
+	// 세로는 피벗 규칙에서 나온다 - 타일 영역의 마지막 행이
+	// (기준점.y + GetFloorOffset)이므로 되짚으면
+	// 기준점.y = 타일 위쪽 + 높이 - GetFloorOffset - 1 이다.
+	const int floorOffset = PropSprite::GetFloorOffset(tileSize);
+
+	const bool isSideAxis = IsSideFacing(facing);
+
+	const int width = isSideAxis ? tileSize : spanInCells;
+	const int height = isSideAxis ? spanInCells : tileSize;
+
+	const Vector2 position(
+		tileX + (width / 2),
+		tileY + height - floorOffset - 1);
+
+	return SpawnActor<StaticPropActor>(propSet, propName, position, facing);
 }
 
 void TileMapLevel::OnLevelMapLoaded(std::shared_ptr<const LevelMap> loaded)

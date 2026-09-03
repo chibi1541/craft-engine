@@ -123,6 +123,7 @@
     <ClCompile Include="Source\Asset\AnimationClip.cpp" />
     <ClCompile Include="Source\Asset\AnimationDataAsset.cpp" />
     <ClCompile Include="Source\Asset\LevelDataAsset.cpp" />
+    <ClCompile Include="Source\Asset\LevelLayout.cpp" />
     <ClCompile Include="Source\Asset\LevelMap.cpp" />
     <ClCompile Include="Source\Actor\StaticPropActor.cpp" />
     <ClCompile Include="Source\Asset\PixelMapText.cpp" />
@@ -187,6 +188,7 @@
     <ClInclude Include="Source\Asset\AnimationClip.h" />
     <ClInclude Include="Source\Asset\AnimationDataAsset.h" />
     <ClInclude Include="Source\Asset\LevelDataAsset.h" />
+    <ClInclude Include="Source\Asset\LevelLayout.h" />
     <ClInclude Include="Source\Asset\LevelMap.h" />
     <ClInclude Include="Source\Actor\Facing.h" />
     <ClInclude Include="Source\Actor\StaticPropActor.h" />

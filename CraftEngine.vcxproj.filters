@@ -341,6 +341,9 @@
     <ClInclude Include="Source\Level\TileMetrics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Asset\LevelLayout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Asset\LevelMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -494,6 +497,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Asset\PropSpriteLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Asset\LevelLayout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Asset\LevelMap.cpp">

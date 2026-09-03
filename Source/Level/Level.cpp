@@ -3,9 +3,20 @@
 #include "Actor/Actor.h"
 #include "Camera/CameraManager.h"
 #include "Math/ViewTransform.h"
+#include "Input/Input.h"
+#include "Math/SymbolPalette.h"
 #include "Render/RenderLayer.h"
+#include "Render/Renderer.h"
 
 NAME_SPACE_BEGIN(Craft)
+
+namespace
+{
+	// 기준점에 찍을 한 칸짜리 픽셀맵. 'R'은 SymbolPalette의 Red다.
+	const std::string pivotMarker = "R";
+}
+
+bool Level::showPivotDebug = false;
 
 Level::Level()
 {
@@ -39,6 +50,15 @@ void Level::BeginPlay()
 
 void Level::Tick(float deltaTime)
 {
+	// 디버그 표시 토글. GetKeyDown이라 누르고 있어도 한 번만 뒤집힌다.
+	//
+	// 입력을 여기서 직접 읽는 이유 - 이건 게임플레이 입력이 아니라 개발용 스위치라서,
+	// 액터에 InputComponent를 달아 바인딩할 대상이 아니다.
+	if (Input::Get().GetKeyDown('P'))
+	{
+		showPivotDebug = !showPivotDebug;
+	}
+
 	for (const std::shared_ptr<Actor>& actor : actorList)
 	{
 		// 검증 - 활성화되지 않았으면 건너뛰기.
@@ -129,6 +149,29 @@ void Level::Draw()
 
 		// Draw 이벤트 호출.
 		actor->Draw();
+
+		// 기준점 표시. 액터를 그린 "뒤"에 올려야 그림에 가려지지 않는다.
+		//
+		// SubmitPixelsWorld를 쓰는 이유 - 액터 스프라이트와 완전히 같은 좌표 변환을
+		// 타야 한다. 여기서 다른 경로로 계산하면 점과 그림이 각자 틀려서
+		// 무엇을 믿어야 할지 알 수 없게 된다.
+		// 피벗 오프셋은 주지 않는다. 기준점 그 자체를 찍는 것이 목적이다.
+		if (showPivotDebug)
+		{
+			Renderer::Get().SubmitPixelsWorld(
+				pivotMarker,
+				SymbolPalette::GetTable(),
+				actor->GetPosition(),
+				RenderLayer::WorldUI,
+				SymbolPalette::TransparentSymbol);
+		}
+	}
+
+	// 켜져 있다는 것을 화면으로 알린다. 점이 안 보일 때
+	// 모드가 꺼진 건지 기준점이 화면 밖인지 구분되어야 한다.
+	if (showPivotDebug)
+	{
+		Renderer::Get().Submit("[P] pivot", Vector2(0, 1), Color::Red, RenderLayer::UI);
 	}
 }
 

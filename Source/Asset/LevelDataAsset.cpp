@@ -42,6 +42,14 @@ bool LevelDataAsset::LoadFromXml(XmlNode& root)
 		}
 
 		levelPaths.emplace(name, path);
+
+		// layout은 선택 항목이다. 없으면 프롭 없는 레벨.
+		const std::wstring layoutPath = itemNode.GetStringAttr(L"layout", L"");
+
+		if (layoutPath.empty() == false)
+		{
+			layoutPaths.emplace(name, layoutPath);
+		}
 	}
 
 	return !levelPaths.empty();
@@ -52,6 +60,18 @@ const std::wstring& LevelDataAsset::FindLevelPath(const std::string& name) const
 	auto it = levelPaths.find(name);
 
 	if (it == levelPaths.end())
+	{
+		return emptyPath;
+	}
+
+	return it->second;
+}
+
+const std::wstring& LevelDataAsset::FindLayoutPath(const std::string& name) const
+{
+	auto it = layoutPaths.find(name);
+
+	if (it == layoutPaths.end())
 	{
 		return emptyPath;
 	}

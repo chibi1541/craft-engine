@@ -1,8 +1,7 @@
 ﻿#include "pch.h"
 #include "Actor/StaticPropActor.h"
 
-#include "Asset/AssetManager.h"
-#include "Asset/PropDataAsset.h"
+#include "Level/Level.h"
 #include "Level/TileMetrics.h"
 #include "Math/SymbolPalette.h"
 #include "Render/Renderer.h"
@@ -22,81 +21,34 @@ namespace
 }
 
 StaticPropActor::StaticPropActor(
-	std::string propSetName,
+	std::shared_ptr<const PropSpriteSet> propSet,
 	std::string propName,
 	const Vector2& position,
 	EFacing facing)
 	: Actor("", position)
-	, propSetName(std::move(propSetName))
 	, propName(std::move(propName))
 	, facing(facing)
+	, propSet(std::move(propSet))
 	, displaySlot(facing)
 {
 	// 그릴 글자가 없다. Actor::Draw의 텍스트 경로는 image가 비어 있으면 건너뛴다.
 	// 이 액터는 픽셀 스프라이트만 그린다.
-}
 
-void StaticPropActor::BeginPlay()
-{
-	super::BeginPlay();
-
-	// 이름 -> 경로는 PropData가 알고 있다. 스프라이트 파일은 그 경로로 따로 읽는다.
-	// (TileMapLevel이 LevelData에서 격자 경로를 찾는 것과 같은 구조)
-	const std::shared_ptr<const PropDataAsset> propData =
-		AssetManager::Get().GetPrimaryAsset<PropDataAsset>("PropData");
-
-	if (nullptr == propData)
+	if (nullptr == this->propSet)
 	{
-		::OutputDebugStringA("[StaticPropActor] PropData primary asset not found\n");
+		::OutputDebugStringA("[StaticPropActor] prop set is null\n");
 		return;
 	}
 
-	const std::wstring& path = propData->FindPropSetPath(propSetName);
+	auto it = this->propSet->find(this->propName);
 
-	if (path.empty())
-	{
-		::OutputDebugStringA("[StaticPropActor] prop set name not found in PropData\n");
-		return;
-	}
-
-	// 워커가 파싱하고 콜백은 게임 쓰레드(AssetManager::Tick)에서 불린다.
-	// 그 사이에 액터가 파괴될 수 있으므로 weak로 잡아 자신의 생존을 확인한다.
-	std::weak_ptr<Actor> weakSelf = weak_from_this();
-
-	AssetManager::Get().LoadAsync<PropSpriteSet>(path.c_str(),
-		[weakSelf](std::shared_ptr<const PropSpriteSet> loaded)
-		{
-			const std::shared_ptr<StaticPropActor> self = Cast<StaticPropActor>(weakSelf.lock());
-
-			if (nullptr == self)
-			{
-				return;
-			}
-
-			self->OnPropSetLoaded(std::move(loaded));
-		});
-}
-
-void StaticPropActor::OnPropSetLoaded(std::shared_ptr<const PropSpriteSet> loaded)
-{
-	if (nullptr == loaded)
-	{
-		::OutputDebugStringA("[StaticPropActor] prop set failed to load\n");
-		return;
-	}
-
-	auto it = loaded->find(propName);
-
-	if (it == loaded->end())
+	if (it == this->propSet->end())
 	{
 		// 프롭 이름 오타. 이 액터만 안 보이고 나머지는 정상 동작한다.
 		::OutputDebugStringA("[StaticPropActor] prop name not found in prop set\n");
 		return;
 	}
 
-	// 묶음을 먼저 붙들어야 아래 포인터가 유효해진다.
-	// (놓으면 AssetManager가 유휴로 보고 30초 뒤에 내린다)
-	loadedSet = std::move(loaded);
 	propSprite = &it->second;
 }
 
@@ -111,16 +63,38 @@ void StaticPropActor::OnViewRotationChanged(int quarterTurns)
 
 Rect StaticPropActor::GetTileBounds() const
 {
-	const int span = (propSprite != nullptr) ? propSprite->GetTileSpan() : 1;
-	const int sizeInCells = span * PropTileSize;
+	const std::shared_ptr<Level> level = GetOwner();
+	const int tileSize = (level != nullptr) ? level->GetTileSize() : DefaultTileSize;
 
-	// 기준점은 타일 영역의 하단 중앙이다. 그래서 영역은 기준점에서 위로 뻗는다.
-	// GetBottom()이 "마지막 셀"이라 높이에서 1을 빼야 기준점 행이 영역의 마지막 행이 된다.
+	const int span = (propSprite != nullptr) ? propSprite->GetTileSpan() : 1;
+	const int spanInCells = span * tileSize;
+
+	// 타일 영역은 정사각이 아니다. 정사각인 것은 타일 한 칸이고,
+	// 오브젝트는 크기만큼 타일을 여러 개 먹는다. 깊이는 언제나 1타일이다.
+	//
+	// 스팬이 걸리는 축은 카메라가 아니라 facing이 정한다. facing은 월드 값이라
+	// 화면을 돌려도 이 영역은 그대로다(이동형 액터의 판정이 뷰에 따라 달라지지 않는다).
+	// 기준점의 위치는 슬롯과 무관하다 - 피벗 기본값과 같은 방침이다.
+	//
+	// 세로 위치는 피벗과 같은 값에서 온다. 기본 피벗이 이미지 하단에서
+	// GetFloorOffset만큼 위라, 그려진 이미지의 바닥 행이 곧
+	// (기준점.y + GetFloorOffset)이고 타일 영역의 마지막 행도 거기에 맞춘다.
+	// 그래야 발밑과 충돌 영역이 겹친다.
+	//
+	// 스프라이트가 @pivot으로 기본값을 덮었더라도 이 영역은 따라가지 않는다.
+	// 충돌 판정이 아트 미세조정에 끌려다니면 안 된다.
+	const int floorOffset = PropSprite::GetFloorOffset(tileSize);
+
+	const bool isSideAxis = IsSideFacing(facing);
+
+	const int width = isSideAxis ? tileSize : spanInCells;
+	const int height = isSideAxis ? spanInCells : tileSize;
+
 	return Rect(
-		position.x - (sizeInCells / 2),
-		position.y - sizeInCells + 1,
-		sizeInCells,
-		sizeInCells);
+		position.x - (width / 2),
+		position.y + floorOffset - height + 1,
+		width,
+		height);
 }
 
 void StaticPropActor::Draw()
@@ -130,7 +104,7 @@ void StaticPropActor::Draw()
 		return;
 	}
 
-	// 애셋이 아직 안 왔으면 이번 프레임은 건너뛴다. 몇 프레임 뒤에 도착한다.
+	// 이름을 못 찾은 액터는 그릴 것이 없다(생성자에서 이미 이유를 남겼다).
 	if (propSprite != nullptr)
 	{
 		const Sprite& sprite = propSprite->GetSprite(displaySlot);
@@ -139,7 +113,7 @@ void StaticPropActor::Draw()
 		//
 		// ★ 피벗을 월드 좌표에 더하면 안 된다 ★
 		// 월드 앵커는 기준점까지만이고, 피벗은 뷰 변환 "뒤에" 화면 공간에서 빼야 한다.
-		// 앵커까지 함께 회전시키면 90°에서 그림이 옆으로 샌다(빌보드).
+		// 앵커까지 함께 회전시키면 90도에서 그림이 옆으로 샌다(빌보드).
 		// SubmitPixelsWorld의 screenPixelOffset이 정확히 이걸 위해 있는 인자다.
 		const Vector2 pivotOffset(
 			RoundPivot(propSprite->GetPivotX(displaySlot)),
