@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
+#include "Asset/PixelMapText.h"
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -180,57 +181,10 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 
 std::string SpriteAnimationLoader::NormalizePixelMap(const std::string& rawText)
 {
-	std::string result;
-	result.reserve(rawText.size());
-
-	size_t lineStart = 0;
-
-	while (lineStart <= rawText.size())
-	{
-		const size_t newlinePos = rawText.find('\n', lineStart);
-		const size_t lineEnd = (newlinePos == std::string::npos) ? rawText.size() : newlinePos;
-
-		// 줄 앞뒤 공백/탭/'\r'을 버린다.
-		// 픽셀맵은 투명을 '.'으로 쓰기 때문에 공백을 지워도 그림이 망가지지 않고,
-		// 덕분에 XML을 자유롭게 들여쓸 수 있다.
-		size_t begin = lineStart;
-		size_t end = lineEnd;
-
-		while (begin < end && (rawText[begin] == ' ' || rawText[begin] == '\t' || rawText[begin] == '\r'))
-		{
-			++begin;
-		}
-
-		while (end > begin && (rawText[end - 1] == ' ' || rawText[end - 1] == '\t' || rawText[end - 1] == '\r'))
-		{
-			--end;
-		}
-
-		// 빈 줄은 버린다(여는 태그 다음 줄, 닫는 태그 앞 줄 등).
-		if (end > begin)
-		{
-			for (size_t index = begin; index < end; ++index)
-			{
-				const char symbol = rawText[index];
-
-				// 팔레트에 없는 기호는 픽셀맵 오타다.
-				// Renderer까지 흘려보내지 말고 데이터를 읽는 여기서 잡는다.
-				ASSERT_CRASH(symbol == SymbolPalette::TransparentSymbol || SymbolPalette::Contains(symbol));
-			}
-
-			result.append(rawText, begin, end - begin);
-			result.push_back('\n');
-		}
-
-		if (newlinePos == std::string::npos)
-		{
-			break;
-		}
-
-		lineStart = newlinePos + 1;
-	}
-
-	return result;
+	// 실제 처리는 공용 함수에 있다(Asset/PixelMapText.h).
+	// 프롭 스프라이트 로더도 같은 규칙을 써야 해서 한 곳으로 옮겼다 -
+	// 복사해두면 한쪽만 고쳐졌을 때 조용히 갈라진다.
+	return NormalizePixelMapText(rawText);
 }
 
 NAME_SPACE_END

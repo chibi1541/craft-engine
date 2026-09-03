@@ -8,6 +8,7 @@
 #include "Math/Palette.h"
 #include "Asset/AssetManager.h"
 #include "Asset/LevelMap.h"
+#include "Asset/PropSpriteLoader.h"
 #include "Asset/AssetTypes.h"
 #include "Asset/SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
@@ -69,6 +70,11 @@ Engine::Engine()
 		[](const WCHAR* path)
 		{
 			return std::make_shared<const LevelMap>(LevelMap::LoadFromFile(path));
+		});
+	assetManager->RegisterLoader<PropSpriteSet>(
+		[](const WCHAR* path)
+		{
+			return std::make_shared<const PropSpriteSet>(PropSpriteLoader::LoadFromFile(path));
 		});
 
 	// 워커를 띄우기 전에 메인에서 한 번 만들어 둔다.

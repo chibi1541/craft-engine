@@ -124,6 +124,10 @@
     <ClCompile Include="Source\Asset\AnimationDataAsset.cpp" />
     <ClCompile Include="Source\Asset\LevelDataAsset.cpp" />
     <ClCompile Include="Source\Asset\LevelMap.cpp" />
+    <ClCompile Include="Source\Actor\StaticPropActor.cpp" />
+    <ClCompile Include="Source\Asset\PixelMapText.cpp" />
+    <ClCompile Include="Source\Asset\PropDataAsset.cpp" />
+    <ClCompile Include="Source\Asset\PropSpriteLoader.cpp" />
     <ClCompile Include="Source\Asset\AnimStateMachineLoader.cpp" />
     <ClCompile Include="Source\Asset\AssetManager.cpp" />
     <ClCompile Include="Source\Asset\PrimaryDataAsset.cpp" />
@@ -184,6 +188,14 @@
     <ClInclude Include="Source\Asset\AnimationDataAsset.h" />
     <ClInclude Include="Source\Asset\LevelDataAsset.h" />
     <ClInclude Include="Source\Asset\LevelMap.h" />
+    <ClInclude Include="Source\Actor\Facing.h" />
+    <ClInclude Include="Source\Actor\StaticPropActor.h" />
+    <ClInclude Include="Source\Asset\PixelMapText.h" />
+    <ClInclude Include="Source\Asset\PropDataAsset.h" />
+    <ClInclude Include="Source\Asset\PropSprite.h" />
+    <ClInclude Include="Source\Asset\PropSpriteLoader.h" />
+    <ClInclude Include="Source\Asset\PropSpriteSet.h" />
+    <ClInclude Include="Source\Level\TileMetrics.h" />
     <ClInclude Include="Source\Asset\AnimStateMachineLoader.h" />
     <ClInclude Include="Source\Asset\AssetManager.h" />
     <ClInclude Include="Source\Asset\AssetTypes.h" />
