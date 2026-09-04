@@ -52,6 +52,13 @@ Engine::Engine()
 	// 랜더러 객체 생성
 	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
 
+	// 커서 픽셀 좌표를 셀로 환산할 격자 크기를 Input에 알려준다.
+	//
+	// Input이 먼저 생기기 때문에 생성자에서는 알 수 없고, Renderer를 직접 보게 하면
+	// 입력이 렌더링에 의존하게 된다. 둘 다 만드는 여기서 이어주는 편이 낫다.
+	// 설정값이 아니라 ScreenBuffer가 클램프한 뒤의 실제 크기를 넘겨야 한다.
+	input->SetScreenCellSize(renderer->GetScreenSize());
+
 	// 카메라 매니저 생성.
 	// 뷰 크기로 렌더러가 실제로 잡은 화면 크기를 쓰므로 renderer 다음이어야 한다.
 	cameraManager = std::make_unique<CameraManager>(renderer->GetScreenSize());

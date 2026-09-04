@@ -106,4 +106,13 @@ const Sprite& AnimationClip::GetFrame(int index) const
 	return frames[index];
 }
 
+void AnimationClip::SetFacingVariant(const std::string& newLogicalName, EFacingSlotSpec spec)
+{
+	// 논리 이름이 비면 상태 머신이 이 클립을 영영 찾지 못한다.
+	ASSERT_CRASH(!newLogicalName.empty());
+
+	logicalName = newLogicalName;
+	facingSpec = spec;
+}
+
 NAME_SPACE_END

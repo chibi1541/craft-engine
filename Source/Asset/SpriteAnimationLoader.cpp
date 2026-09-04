@@ -2,6 +2,7 @@
 #include "SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
 #include "Asset/PixelMapText.h"
+#include <set>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -88,6 +89,10 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 		return clips;
 	}
 
+	// 같은 (논리 이름, 방향) 선언이 두 번 나오면 조용히 덮어써져서 한 장이 사라진다.
+	// 등록 이름이 그 둘을 합친 키라 이것만 모아두면 잡을 수 있다.
+	std::set<std::string> registeredNames;
+
 	for (XmlNode& clipNode : root.FindChildren(L"Clip"))
 	{
 		const std::string name = FileUtils::Convert(clipNode.GetStringAttr(L"name", L""));
@@ -97,6 +102,24 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 		{
 			continue;
 		}
+
+		// facing="Up|Right|Down|Left|Side". 생략하면 방향이 없는 클립이다.
+		const std::string facingText = FileUtils::Convert(clipNode.GetStringAttr(L"facing", L""));
+
+		bool parsedFacing = false;
+		const EFacingSlotSpec facingSpec = ParseFacingSpec(facingText, &parsedFacing);
+
+		// facing 오타를 None으로 흘려보내면 그 클립이 네 슬롯을 통째로 차지해서
+		// 다른 방향 아트를 전부 가린다. 화면만 보고는 원인을 찾을 수 없다.
+		ASSERT_CRASH(parsedFacing);
+
+		// 등록 이름은 방향까지 포함한 키다. 상태 머신이 지목하는 논리 이름은 name 쪽이고,
+		// 그 연결은 아래에서 SetFacingVariant가 만든다.
+		const std::string registrationName = (EFacingSlotSpec::None == facingSpec)
+			? name : (name + "@" + facingText);
+
+		ASSERT_CRASH(registeredNames.find(registrationName) == registeredNames.end());
+		registeredNames.insert(registrationName);
 
 		const float framesPerSecond = clipNode.GetFloatAttr(L"fps", 12.0f);
 		const bool isLooping = clipNode.GetBoolAttr(L"loop", true);
@@ -154,7 +177,7 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 
 		if (pivotText.empty())
 		{
-			clip = std::make_shared<AnimationClip>(name, frames, framesPerSecond, isLooping);
+			clip = std::make_shared<AnimationClip>(registrationName, frames, framesPerSecond, isLooping);
 		}
 		else
 		{
@@ -167,7 +190,14 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 			ASSERT_CRASH(hasParsedPivot);
 
 			clip = std::make_shared<AnimationClip>(
-				name, frames, framesPerSecond, isLooping, pivotX, pivotY);
+				registrationName, frames, framesPerSecond, isLooping, pivotX, pivotY);
+		}
+
+		// 방향 변형이면 논리 이름을 연결해준다. 방향이 없는 클립은 등록 이름이 곧 논리 이름이라
+		// 아무것도 하지 않는다(AnimationClip::GetLogicalName이 name으로 폴백한다).
+		if (EFacingSlotSpec::None != facingSpec)
+		{
+			clip->SetFacingVariant(name, facingSpec);
 		}
 
 		// 노티파이는 클립을 만든 뒤에 넣는다 - 프레임 범위 검증에 frameCount가 필요하다.

@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "AnimationPlayer.h"
+#include <cmath>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -15,6 +16,60 @@ void AnimationPlayer::Play(const std::shared_ptr<const AnimationClip>& newClip, 
 	clip = newClip;
 
 	Reset();
+}
+
+void AnimationPlayer::RetargetClip(const std::shared_ptr<const AnimationClip>& newClip)
+{
+	// 같은 클립이면 할 일이 없다. Play와 같은 규칙.
+	if (clip == newClip)
+	{
+		return;
+	}
+
+	// 갈아타기 전 위치를 비율로 잡아둔다. clip을 바꾼 뒤에는 못 구한다.
+	const float normalizedTime = GetNormalizedTime();
+	const bool wasFinished = hasFinished;
+
+	clip = newClip;
+
+	const int frameCount = (nullptr != clip) ? clip->GetFrameCount() : 0;
+
+	// 예외 처리 - 빈 클립으로 갈아타면 이어받을 위치가 없다.
+	if (frameCount <= 0)
+	{
+		elapsedTime = 0.0f;
+		currentFrameIndex = 0;
+		hasFinished = false;
+
+		return;
+	}
+
+	// ★ 인덱스가 아니라 비율을 옮긴다 ★
+	// 3프레임 걷기에서 2프레임 변형으로 갈아탈 때 인덱스 2를 그대로 쓰면 범위를 넘고,
+	// 잘라내면 끝 장에서 멈춘 것처럼 보인다. 비율로 옮기면 걸음의 위상이 그대로 이어진다.
+	const float scaledTime = normalizedTime * frameCount;
+
+	int frameIndex = static_cast<int>(::floorf(scaledTime));
+
+	if (frameIndex >= frameCount)
+	{
+		frameIndex = frameCount - 1;
+	}
+
+	if (frameIndex < 0)
+	{
+		frameIndex = 0;
+	}
+
+	currentFrameIndex = frameIndex;
+	elapsedTime = (scaledTime - frameIndex) * clip->GetFrameDuration();
+
+	// 이미 끝난 논루프 재생이 방향만 바꿨다고 되살아나면 안 된다.
+	// (공격이 끝나 마지막 장에서 멈춰 있는데 커서를 돌렸다고 다시 휘두르는 것)
+	hasFinished = wasFinished && !clip->IsLooping();
+
+	// framesEnteredThisTick에 아무것도 넣지 않는다. 노티파이는 "그 장에 새로 들어갔을 때"
+	// 울리는 것이고, 방향만 바꾼 것은 들어간 것이 아니다.
 }
 
 void AnimationPlayer::Tick(float deltaTime)
