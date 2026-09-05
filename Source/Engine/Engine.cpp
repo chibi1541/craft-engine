@@ -7,6 +7,9 @@
 #include "Camera/CameraManager.h"
 #include "Math/Palette.h"
 #include "Asset/AssetManager.h"
+#include "Asset/LevelMap.h"
+#include "Asset/PropSpriteLoader.h"
+#include "Asset/LevelLayout.h"
 #include "Asset/AssetTypes.h"
 #include "Asset/SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
@@ -49,6 +52,13 @@ Engine::Engine()
 	// 랜더러 객체 생성
 	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
 
+	// 커서 픽셀 좌표를 셀로 환산할 격자 크기를 Input에 알려준다.
+	//
+	// Input이 먼저 생기기 때문에 생성자에서는 알 수 없고, Renderer를 직접 보게 하면
+	// 입력이 렌더링에 의존하게 된다. 둘 다 만드는 여기서 이어주는 편이 낫다.
+	// 설정값이 아니라 ScreenBuffer가 클램프한 뒤의 실제 크기를 넘겨야 한다.
+	input->SetScreenCellSize(renderer->GetScreenSize());
+
 	// 카메라 매니저 생성.
 	// 뷰 크기로 렌더러가 실제로 잡은 화면 크기를 쓰므로 renderer 다음이어야 한다.
 	cameraManager = std::make_unique<CameraManager>(renderer->GetScreenSize());
@@ -63,6 +73,21 @@ Engine::Engine()
 		[](const WCHAR* path)
 		{
 			return std::make_shared<const AnimationClipSet>(SpriteAnimationLoader::LoadFromFile(path));
+		});
+	assetManager->RegisterLoader<LevelMap>(
+		[](const WCHAR* path)
+		{
+			return std::make_shared<const LevelMap>(LevelMap::LoadFromFile(path));
+		});
+	assetManager->RegisterLoader<PropSpriteSet>(
+		[](const WCHAR* path)
+		{
+			return std::make_shared<const PropSpriteSet>(PropSpriteLoader::LoadFromFile(path));
+		});
+	assetManager->RegisterLoader<LevelLayout>(
+		[](const WCHAR* path)
+		{
+			return std::make_shared<const LevelLayout>(LevelLayout::LoadFromFile(path));
 		});
 
 	// 워커를 띄우기 전에 메인에서 한 번 만들어 둔다.

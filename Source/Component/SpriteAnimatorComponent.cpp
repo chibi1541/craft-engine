@@ -70,6 +70,10 @@ int SpriteAnimatorComponent::LoadClipsFromFile(const WCHAR* path)
 		animInstance.AddClip(clip);
 	}
 
+	// 방향 슬롯을 정리하고 빈 자리를 채운다. 안 불러도 다음 조회 때 알아서 불리지만,
+	// 여기서 부르면 데이터 실수가 프레임 중간이 아니라 로드하는 자리에서 터진다.
+	animInstance.FinalizeClips();
+
 	return static_cast<int>(loadedClips->size());
 }
 
@@ -95,6 +99,10 @@ void SpriteAnimatorComponent::LoadClipsFromFileAsync(const WCHAR* path, std::fun
 			{
 				animInstance.AddClip(clip);
 			}
+
+			// onLoaded보다 반드시 앞이다 - 그 안에서 상태 머신을 읽고,
+			// 로더가 State의 clip 이름을 HasClip으로 검증한다.
+			animInstance.FinalizeClips();
 
 			onLoaded(static_cast<int>(loadedClips->size()));
 		});

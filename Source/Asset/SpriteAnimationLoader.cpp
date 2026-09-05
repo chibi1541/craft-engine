@@ -1,6 +1,8 @@
 ﻿#include "pch.h"
 #include "SpriteAnimationLoader.h"
 #include "Math/SymbolPalette.h"
+#include "Asset/PixelMapText.h"
+#include <set>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -87,6 +89,10 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 		return clips;
 	}
 
+	// 같은 (논리 이름, 방향) 선언이 두 번 나오면 조용히 덮어써져서 한 장이 사라진다.
+	// 등록 이름이 그 둘을 합친 키라 이것만 모아두면 잡을 수 있다.
+	std::set<std::string> registeredNames;
+
 	for (XmlNode& clipNode : root.FindChildren(L"Clip"))
 	{
 		const std::string name = FileUtils::Convert(clipNode.GetStringAttr(L"name", L""));
@@ -96,6 +102,24 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 		{
 			continue;
 		}
+
+		// facing="Up|Right|Down|Left|Side". 생략하면 방향이 없는 클립이다.
+		const std::string facingText = FileUtils::Convert(clipNode.GetStringAttr(L"facing", L""));
+
+		bool parsedFacing = false;
+		const EFacingSlotSpec facingSpec = ParseFacingSpec(facingText, &parsedFacing);
+
+		// facing 오타를 None으로 흘려보내면 그 클립이 네 슬롯을 통째로 차지해서
+		// 다른 방향 아트를 전부 가린다. 화면만 보고는 원인을 찾을 수 없다.
+		ASSERT_CRASH(parsedFacing);
+
+		// 등록 이름은 방향까지 포함한 키다. 상태 머신이 지목하는 논리 이름은 name 쪽이고,
+		// 그 연결은 아래에서 SetFacingVariant가 만든다.
+		const std::string registrationName = (EFacingSlotSpec::None == facingSpec)
+			? name : (name + "@" + facingText);
+
+		ASSERT_CRASH(registeredNames.find(registrationName) == registeredNames.end());
+		registeredNames.insert(registrationName);
 
 		const float framesPerSecond = clipNode.GetFloatAttr(L"fps", 12.0f);
 		const bool isLooping = clipNode.GetBoolAttr(L"loop", true);
@@ -153,7 +177,7 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 
 		if (pivotText.empty())
 		{
-			clip = std::make_shared<AnimationClip>(name, frames, framesPerSecond, isLooping);
+			clip = std::make_shared<AnimationClip>(registrationName, frames, framesPerSecond, isLooping);
 		}
 		else
 		{
@@ -166,7 +190,14 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 			ASSERT_CRASH(hasParsedPivot);
 
 			clip = std::make_shared<AnimationClip>(
-				name, frames, framesPerSecond, isLooping, pivotX, pivotY);
+				registrationName, frames, framesPerSecond, isLooping, pivotX, pivotY);
+		}
+
+		// 방향 변형이면 논리 이름을 연결해준다. 방향이 없는 클립은 등록 이름이 곧 논리 이름이라
+		// 아무것도 하지 않는다(AnimationClip::GetLogicalName이 name으로 폴백한다).
+		if (EFacingSlotSpec::None != facingSpec)
+		{
+			clip->SetFacingVariant(name, facingSpec);
 		}
 
 		// 노티파이는 클립을 만든 뒤에 넣는다 - 프레임 범위 검증에 frameCount가 필요하다.
@@ -180,57 +211,10 @@ std::vector<std::shared_ptr<const AnimationClip>> SpriteAnimationLoader::LoadFro
 
 std::string SpriteAnimationLoader::NormalizePixelMap(const std::string& rawText)
 {
-	std::string result;
-	result.reserve(rawText.size());
-
-	size_t lineStart = 0;
-
-	while (lineStart <= rawText.size())
-	{
-		const size_t newlinePos = rawText.find('\n', lineStart);
-		const size_t lineEnd = (newlinePos == std::string::npos) ? rawText.size() : newlinePos;
-
-		// 줄 앞뒤 공백/탭/'\r'을 버린다.
-		// 픽셀맵은 투명을 '.'으로 쓰기 때문에 공백을 지워도 그림이 망가지지 않고,
-		// 덕분에 XML을 자유롭게 들여쓸 수 있다.
-		size_t begin = lineStart;
-		size_t end = lineEnd;
-
-		while (begin < end && (rawText[begin] == ' ' || rawText[begin] == '\t' || rawText[begin] == '\r'))
-		{
-			++begin;
-		}
-
-		while (end > begin && (rawText[end - 1] == ' ' || rawText[end - 1] == '\t' || rawText[end - 1] == '\r'))
-		{
-			--end;
-		}
-
-		// 빈 줄은 버린다(여는 태그 다음 줄, 닫는 태그 앞 줄 등).
-		if (end > begin)
-		{
-			for (size_t index = begin; index < end; ++index)
-			{
-				const char symbol = rawText[index];
-
-				// 팔레트에 없는 기호는 픽셀맵 오타다.
-				// Renderer까지 흘려보내지 말고 데이터를 읽는 여기서 잡는다.
-				ASSERT_CRASH(symbol == SymbolPalette::TransparentSymbol || SymbolPalette::Contains(symbol));
-			}
-
-			result.append(rawText, begin, end - begin);
-			result.push_back('\n');
-		}
-
-		if (newlinePos == std::string::npos)
-		{
-			break;
-		}
-
-		lineStart = newlinePos + 1;
-	}
-
-	return result;
+	// 실제 처리는 공용 함수에 있다(Asset/PixelMapText.h).
+	// 프롭 스프라이트 로더도 같은 규칙을 써야 해서 한 곳으로 옮겼다 -
+	// 복사해두면 한쪽만 고쳐졌을 때 조용히 갈라진다.
+	return NormalizePixelMapText(rawText);
 }
 
 NAME_SPACE_END

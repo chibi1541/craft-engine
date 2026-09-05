@@ -141,6 +141,10 @@ void CameraManager::BlendViewRotationTo(int quarterTurns, float blendTime)
 
 	if (blendTime <= 0.0f)
 	{
+		// 즉시 스냅도 "정착"이다. 보간 완료 경로와 같이 알려야
+		// 카메라 전환/승계로 각도가 바뀐 것을 놓치지 않는다.
+		++viewRotationVersion;
+
 		// 즉시 스냅.
 		viewAngleDegrees = Normalize360(targetAngle);
 		blendDuration = 0.0f;
@@ -203,6 +207,9 @@ void CameraManager::Tick(float deltaTime)
 			// 정확 스냅 후 정수 경로로 복귀.
 			viewAngleDegrees = Normalize360(targetQuarterTurns * 90.0f);
 			blendDuration = 0.0f;
+
+			// 회전이 여기서 정착한다. 보는 쪽(Level::Draw)이 이번 프레임에 알아챈다.
+			++viewRotationVersion;
 		}
 		else
 		{
@@ -288,6 +295,19 @@ Vector2 CameraManager::GetRotatedViewExtent() const
 	return Vector2(
 		CeilToInt(viewSize.x * ca + viewSize.y * sa),
 		CeilToInt(viewSize.x * sa + viewSize.y * ca));
+}
+
+Rect CameraManager::GetViewWorldBounds(int margin) const
+{
+	// 회전된 뷰가 월드에서 실제로 덮는 AABB. 클램프가 쓰는 바로 그 계산이다.
+	// (정지면 정수 parity 스왑, 보간 중이면 현재 각도의 실제 크기)
+	const Vector2 extent = GetRotatedViewExtent();
+
+	const Vector2 origin(
+		viewCenterWorld.x - (extent.x / 2) - margin,
+		viewCenterWorld.y - (extent.y / 2) - margin);
+
+	return Rect(origin, Vector2(extent.x + margin * 2, extent.y + margin * 2));
 }
 
 Vector2 CameraManager::ClampViewCenter(const Vector2& desiredCenter) const

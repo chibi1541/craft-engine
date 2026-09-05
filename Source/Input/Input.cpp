@@ -109,6 +109,79 @@ namespace Craft
 		state.isKeyDown = isKeyDown;
 	}
 
+	void Input::SetScreenCellSize(const Vector2& newScreenCellSize)
+	{
+		screenCellSize = newScreenCellSize;
+	}
+
+	void Input::PollMousePosition()
+	{
+		// 화면 크기를 아직 모르면 환산할 수가 없다. 이벤트로 들어온 값을 그대로 둔다.
+		if (screenCellSize.x <= 0 || screenCellSize.y <= 0)
+		{
+			return;
+		}
+
+		// 포커스가 없으면 커서가 남의 창 위에 있는 것이다.
+		// 그때 읽은 좌표로 조준 방향을 바꾸면 창을 다시 누르는 순간 캐릭터가 홱 돈다.
+		if (!HasConsoleFocus())
+		{
+			return;
+		}
+
+		const HWND consoleWindow = GetConsoleWindow();
+
+		if (nullptr == consoleWindow)
+		{
+			return;
+		}
+
+		RECT clientRect = {};
+
+		if (!GetClientRect(consoleWindow, &clientRect))
+		{
+			return;
+		}
+
+		const int clientWidth = clientRect.right - clientRect.left;
+		const int clientHeight = clientRect.bottom - clientRect.top;
+
+		// 창이 최소화되면 클라이언트 영역이 0이 된다. 0으로 나누지 않는다.
+		if (clientWidth <= 0 || clientHeight <= 0)
+		{
+			return;
+		}
+
+		POINT cursor = {};
+
+		if (!GetCursorPos(&cursor))
+		{
+			return;
+		}
+
+		if (!ScreenToClient(consoleWindow, &cursor))
+		{
+			return;
+		}
+
+		// 창 밖은 가장자리로 자른다.
+		//
+		// 폰트 크기(8x8)를 상수로 쓰지 않고 클라이언트 영역을 격자 수로 나누는 이유 -
+		// 콘솔 창은 DPI 배율을 타서 실제 셀 픽셀 크기가 설정값과 다를 수 있다.
+		// 클라이언트 영역 전체가 곧 화면 격자이므로 비례로 계산하면 항상 맞는다.
+		//
+		// 자르기를 나눗셈 전에 하는 것이 중요하다. 정수 나눗셈은 0쪽으로 잘려서
+		// 커서가 창 왼쪽 밖(-1픽셀)에 있어도 0열이 나오고, 그러면 왼쪽 끝과 구분이 안 된다.
+		int cursorX = static_cast<int>(cursor.x);
+		int cursorY = static_cast<int>(cursor.y);
+
+		cursorX = (cursorX < 0) ? 0 : ((cursorX > clientWidth - 1) ? clientWidth - 1 : cursorX);
+		cursorY = (cursorY < 0) ? 0 : ((cursorY > clientHeight - 1) ? clientHeight - 1 : cursorY);
+
+		mousePosition.x = (cursorX * screenCellSize.x) / clientWidth;
+		mousePosition.y = (cursorY * screenCellSize.y) / clientHeight;
+	}
+
 	bool Input::HasConsoleFocus() const
 	{
 		return GetConsoleWindow() == GetForegroundWindow();
@@ -257,6 +330,14 @@ namespace Craft
 		// 더블클릭의 두 번째 해제 이벤트가 오지 않아 눌린 채로 남는 것을 여기서 푼다.
 		// 키보드는 해제 이벤트가 신뢰할 만하므로 대상이 아니다.
 		ReconcileMouseButtons();
+
+		// 커서 위치도 실제 값으로 덮어쓴다. 이벤트보다 뒤인 것이 중요하다 -
+		// 이벤트로 들어온 위치는 그 이벤트가 발생한 시점의 값이고, 이쪽이 지금 값이다.
+		//
+		// 버튼과 달리 위치는 프레임마다 반드시 최신이어야 한다.
+		// 조준 방향처럼 매 프레임 각을 다시 재는 쪽에서는, 이벤트가 뜸한 순간마다
+		// 방향이 멈췄다가 툭 튀는 것으로 보인다.
+		PollMousePosition();
 	}
 
 	void Input::SavePreviousStates()
