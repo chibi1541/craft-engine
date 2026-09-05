@@ -224,10 +224,12 @@ void Renderer::SubmitWorld(
 	Color color,
 	int sortingOrder,
 	std::optional<Color> backgroundColor,
-	std::optional<Rect> clipRect)
+	std::optional<Rect> clipRect,
+	const Vector2& screenOffset)
 {
 	// 변환은 여기 진입부에서 한 번. clipRect도 position과 같은 공간이므로 함께 옮긴다.
-	Submit(image, ViewToScreen(worldPosition), color, sortingOrder, backgroundColor, ViewClipToScreen(clipRect));
+	// screenOffset은 빌보드 오프셋이라 변환 뒤에 더한다(SubmitPixelsWorld와 같은 규칙).
+	Submit(image, ViewToScreen(worldPosition) + screenOffset, color, sortingOrder, backgroundColor, ViewClipToScreen(clipRect));
 }
 
 void Renderer::SubmitPixelsWorld(

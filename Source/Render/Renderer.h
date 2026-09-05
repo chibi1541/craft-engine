@@ -1,5 +1,5 @@
 ﻿#pragma once
-
+#include "pch.h"
 #include "Math/Vector2.h"
 #include "Math/Color.h"
 #include "Math/Rect.h"
@@ -161,13 +161,18 @@ public:
 	// clipRect는 worldPosition과 같은 좌표 공간(월드)으로 해석된다. 회전 상태에서는
 	// 네 꼭짓점을 변환해 감싸는 화면 공간 AABB로 확대된다(axis-aligned Rect의 한계).
 	// World 제출은 Draw 페이즈에서만 - 뷰는 Engine::Draw 진입부에서 확정된다.
+	// screenOffset: 월드->화면 변환 "뒤에" 더하는 화면 공간 오프셋.
+	// 이름표/체력바처럼 캐릭터 머리 위/발밑에 붙는 오프셋은 뷰가 회전해도
+	// 함께 돌면 안 되므로 월드 좌표가 아니라 이쪽으로 넘긴다. SubmitPixelsWorld의
+	// screenPixelOffset과 같은 규칙이다.
 	void SubmitWorld(
 		const std::string& image,
 		const Vector2& worldPosition,
 		Color color = Color::White,
 		int sortingOrder = 0,
 		std::optional<Color> backgroundColor = std::nullopt,
-		std::optional<Rect> clipRect = std::nullopt
+		std::optional<Rect> clipRect = std::nullopt,
+		const Vector2& screenOffset = Vector2::Zero
 	);
 
 	// SubmitPixels의 월드 좌표판. 규칙은 SubmitWorld와 같다.
