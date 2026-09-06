@@ -49,8 +49,16 @@ Engine::Engine()
 	// 디스패치할 때 Input의 상태를 읽으므로 반드시 input 다음에 만든다.
 	inputSystem = std::make_unique<InputSystem>();
 
-	// 랜더러 객체 생성
-	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height));
+	// 랜더러 객체 생성.
+	//
+	// 콘솔 셀 크기를 같이 넘긴다. 셀 높이가 세로 줄 수의 상한을 정하므로
+	// (화면 세로 픽셀 / 셀 높이 = 최대 줄 수) height만 키워서는 줄 수가 늘지 않는다.
+	ConsoleFontDesc fontDesc;
+	fontDesc.width = setting.fontWidth;
+	fontDesc.height = setting.fontHeight;
+	fontDesc.faceName = setting.fontFace;
+
+	renderer = std::make_unique<Renderer>(Vector2(setting.width, setting.height), fontDesc);
 
 	// 커서 픽셀 좌표를 셀로 환산할 격자 크기를 Input에 알려준다.
 	//
@@ -552,12 +560,14 @@ void Engine::LoadEngineSetting()
 	// 자르는 작업 반복
 	while (nullptr != token)
 	{
-		// 공백 전까지 읽은 문자열을 저장할 변수
-		char key[15] = {};
+		// 공백 전까지 읽은 문자열을 저장할 변수.
+		// sscanf_s는 버퍼보다 긴 토큰을 만나면 아무것도 안 넣고 실패하므로,
+		// 키 이름이 길어져도 넉넉하도록 잡아둔다.
+		char key[32] = {};
 
 		// 포맷을 지정한 문자열 읽기
 		// 공백 문자 전까지 읽어들임(공백은 안들어감)
-		sscanf_s(token, "%s", key, 15);
+		sscanf_s(token, "%s", key, static_cast<unsigned>(sizeof(key)));
 
 		// 키 값을 비교해서 값 설정
 		if (strcmp(key, "framerate") == 0)
@@ -571,6 +581,31 @@ void Engine::LoadEngineSetting()
 		else if (strcmp(key, "height") == 0)
 		{
 			sscanf_s(token, "height = %d", &setting.height);
+		}
+		else if (strcmp(key, "fontWidth") == 0)
+		{
+			sscanf_s(token, "fontWidth = %d", &setting.fontWidth);
+		}
+		else if (strcmp(key, "fontHeight") == 0)
+		{
+			sscanf_s(token, "fontHeight = %d", &setting.fontHeight);
+		}
+		else if (strcmp(key, "fontFace") == 0)
+		{
+			// 콘솔 폰트 API가 wchar_t를 받으므로 변환해서 보관한다.
+			char faceName[Setting::FACE_NAME_SIZE] = {};
+
+			if (sscanf_s(token, "fontFace = %s", faceName, static_cast<unsigned>(sizeof(faceName))) == 1)
+			{
+				wchar_t converted[Setting::FACE_NAME_SIZE] = {};
+
+				// 변환에 실패하면 buffer 내용이 보장되지 않는다.
+				// 성공했을 때만 덮어써서 기본 폰트 이름을 지키게 한다.
+				if (MultiByteToWideChar(CP_ACP, 0, faceName, -1, converted, Setting::FACE_NAME_SIZE) > 0)
+				{
+					wcscpy_s(setting.fontFace, converted);
+				}
+			}
 		}
 
 		// 나머지 문자열 자르기(개행 문자를 기준으로)

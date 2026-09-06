@@ -9,9 +9,10 @@
 #include <optional>
 #include <unordered_map>
 
-NAME_SPACE_BEGIN(Craft)
+// ConsoleFontDesc를 Renderer 생성자의 기본 인자로 쓰므로 완전한 타입이 필요하다.
+#include "Render/ScreenBuffer.h"
 
-class ScreenBuffer;
+NAME_SPACE_BEGIN(Craft)
 
 // 그리기 기능을 전담하는 전문 객체.
 class CRAFT_API Renderer
@@ -112,7 +113,9 @@ class CRAFT_API Renderer
 	}
 
 public:
-	Renderer(const Vector2& screenSize);
+	// fontDesc: 콘솔 셀의 픽셀 크기. 셀 높이가 세로 줄 수를 직접 결정하므로
+	//           (화면 세로 픽셀 / 셀 높이 = 최대 줄 수) 화면 크기와 함께 받는다.
+	Renderer(const Vector2& screenSize, const ConsoleFontDesc& fontDesc = ConsoleFontDesc());
 	~Renderer();
 
 	// 화면에 그릴 데이터를 제출(전달)하는 함수.

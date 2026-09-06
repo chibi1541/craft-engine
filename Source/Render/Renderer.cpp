@@ -4,6 +4,7 @@
 #include "Math/ViewTransform.h"
 
 #include <cmath>
+#include <cstdio>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -50,7 +51,7 @@ void Renderer::Frame::Clear(const Vector2& screenSize, Color backgroundColor)
 
 Renderer* Renderer::instance = nullptr;
 
-Renderer::Renderer(const Vector2& screenSize) : screenSize(screenSize)
+Renderer::Renderer(const Vector2& screenSize, const ConsoleFontDesc& fontDesc) : screenSize(screenSize)
 {
 	// 어서트.
 	ASSERT_CRASH(!instance);
@@ -60,12 +61,29 @@ Renderer::Renderer(const Vector2& screenSize) : screenSize(screenSize)
 	// 요청한 크기가 화면에 안 들어가면 ScreenBuffer가 줄여서 잡으므로,
 	// 먼저 하나를 만들어서 실제로 잡힌 크기를 확정한 뒤 나머지를 맞춘다.
 	// (Frame과 ScreenBuffer의 크기가 어긋나면 그리기가 화면 밖으로 나간다)
-	screenBufferArray[0] = std::make_unique<ScreenBuffer>(screenSize);
+	screenBufferArray[0] = std::make_unique<ScreenBuffer>(screenSize, fontDesc);
 	this->screenSize = screenBufferArray[0]->GetSize();
 	screenBufferArray[0]->Clear();
 
-	screenBufferArray[1] = std::make_unique<ScreenBuffer>(this->screenSize);
+	screenBufferArray[1] = std::make_unique<ScreenBuffer>(this->screenSize, fontDesc);
 	screenBufferArray[1]->Clear();
+
+	// 두 버퍼의 크기가 어긋나면 뒷버퍼에 그린 내용이 화면 밖으로 나간다.
+	// 같은 폰트/화면이라 보통은 같게 잡히지만, 어긋나면 작은 쪽에 맞춘다.
+	const Vector2 backBufferSize = screenBufferArray[1]->GetSize();
+
+	if (backBufferSize.x != this->screenSize.x || backBufferSize.y != this->screenSize.y)
+	{
+		char message[160];
+		sprintf_s(message,
+			"[Renderer] screen buffer size mismatch - front (%d, %d), back (%d, %d)\n",
+			this->screenSize.x, this->screenSize.y, backBufferSize.x, backBufferSize.y);
+
+		::OutputDebugStringA(message);
+
+		this->screenSize.x = (backBufferSize.x < this->screenSize.x) ? backBufferSize.x : this->screenSize.x;
+		this->screenSize.y = (backBufferSize.y < this->screenSize.y) ? backBufferSize.y : this->screenSize.y;
+	}
 
 	const int bufferCount = this->screenSize.x * this->screenSize.y;
 	frame = std::make_unique<Frame>(bufferCount);
@@ -272,9 +290,12 @@ void Renderer::Clear()
 	// 프레딤 값 초기화
 	frame->Clear(screenSize, clearColor);
 
-	// 콘솔 버퍼 초기화
-	GetCurrentBuffer()->Clear();
-
+	// 콘솔 버퍼는 여기서 지우지 않는다.
+	//
+	// ScreenBuffer::Clear는 셀 개수에 비례하는 커널 왕복(FillConsoleOutputCharacterA)인데,
+	// 바로 뒤 ScreenBuffer::Draw가 화면 전체를 어차피 덮어쓴다. 위의 frame->Clear가
+	// 이미 모든 셀을 배경색 공백으로 채워두므로 순수 낭비다.
+	// (셀 수가 늘어날수록 이 비용만 그대로 커진다)
 }
 
 void Renderer::DrawRenderQueue()
