@@ -54,6 +54,9 @@ bool RecvBuffer::OnRead(int32 numOfBytes)
 	}
 
 	_readIndex += numOfBytes;
+
+	Clean();
+
 	return true;
 }
 
