@@ -14,6 +14,7 @@
 #include "Render/Renderer.h"
 
 #include <cmath>
+#include <cstdio>
 
 NAME_SPACE_BEGIN(Craft)
 
@@ -184,7 +185,12 @@ std::shared_ptr<StaticPropActor> TileMapLevel::SpawnProp(
 	// 화면만 봐서는 원인을 못 찾으므로 여기서 잡는다.
 	ASSERT_CRASH(it->second.GetTileSize() == tileSize);
 
-	const int spanInCells = it->second.GetTileSpan() * tileSize;
+	// 타일 영역은 배치/충돌 격자가 공유하는 PropTileBounds 하나로 구한다.
+	const Rect tileBounds = PropTileBounds(
+		tileX, tileY, facing, it->second.GetTileSpan(), tileSize);
+
+	const int width = tileBounds.size.x;
+	const int height = tileBounds.size.y;
 
 	// 타일 좌상단 -> 기준점. StaticPropActor::GetTileBounds의 역산이다.
 	//
@@ -193,14 +199,9 @@ std::shared_ptr<StaticPropActor> TileMapLevel::SpawnProp(
 	// 기준점.y = 타일 위쪽 + 높이 - GetFloorOffset - 1 이다.
 	const int floorOffset = PropSprite::GetFloorOffset(tileSize);
 
-	const bool isSideAxis = IsSideFacing(facing);
-
-	const int width = isSideAxis ? tileSize : spanInCells;
-	const int height = isSideAxis ? spanInCells : tileSize;
-
 	const Vector2 position(
-		tileX + (width / 2),
-		tileY + height - floorOffset - 1);
+		tileBounds.GetLeft() + (width / 2),
+		tileBounds.GetTop() + height - floorOffset - 1);
 
 	return SpawnActor<StaticPropActor>(propSet, propName, position, facing);
 }
@@ -322,6 +323,98 @@ void TileMapLevel::Draw()
 	}
 
 	super::Draw();
+}
+
+void TileMapLevel::BuildCollision() const
+{
+	if (collisionBuilt)
+	{
+		return;
+	}
+
+	// 셋 다 async 로드. 하나라도 안 왔으면 다음 질의에서 다시 시도한다.
+	if (nullptr == levelMap || nullptr == levelLayout || nullptr == propSet)
+	{
+		return;
+	}
+
+	const int w = levelMap->GetWidth();
+	const int h = levelMap->GetHeight();
+
+	if (w <= 0 || h <= 0)
+	{
+		return;
+	}
+
+	const int tileSize = GetTileSize();
+
+	std::vector<uint8_t> grid(static_cast<size_t>(w) * h, 0);
+
+	for (const LevelLayout::Placement& placement : levelLayout->GetPlacements())
+	{
+		const auto it = propSet->find(placement.name);
+
+		if (it == propSet->end())
+		{
+			continue;	// 이름 오타 - SpawnProp 도 이 항목을 건너뛴다.
+		}
+
+		const Rect bounds = PropTileBounds(
+			placement.tileX, placement.tileY, placement.facing,
+			it->second.GetTileSpan(), tileSize);
+
+		const int x0 = (bounds.GetLeft() < 0) ? 0 : bounds.GetLeft();
+		const int y0 = (bounds.GetTop() < 0) ? 0 : bounds.GetTop();
+		const int x1 = (bounds.GetRight() >= w) ? (w - 1) : bounds.GetRight();
+		const int y1 = (bounds.GetBottom() >= h) ? (h - 1) : bounds.GetBottom();
+
+		for (int y = y0; y <= y1; ++y)
+		{
+			for (int x = x0; x <= x1; ++x)
+			{
+				grid[static_cast<size_t>(y) * w + x] = 1;
+			}
+		}
+	}
+
+	blocked = std::move(grid);
+	collisionWidth = w;
+	collisionHeight = h;
+	collisionBuilt = true;
+
+	char message[96];
+	::snprintf(message, sizeof(message),
+		"[TileMapLevel] collision grid %d x %d built (%d props)\n",
+		w, h, static_cast<int>(levelLayout->GetPlacements().size()));
+	::OutputDebugStringA(message);
+}
+
+bool TileMapLevel::IsCellBlocked(int cellX, int cellY) const
+{
+	if (nullptr == levelMap && nullptr == levelLayout)
+	{
+		// 지형 없는 레벨(테스트 등) - 막는 것 없음.
+		return false;
+	}
+
+	if (false == collisionBuilt)
+	{
+		BuildCollision();
+	}
+
+	// 로드 중이라 아직 못 구웠으면 막지 않는다. 완료되면 자동으로 유효해진다.
+	if (false == collisionBuilt)
+	{
+		return false;
+	}
+
+	// 월드 밖 = 벽 (서버 Level::IsCellBlocked 와 동일).
+	if (cellX < 0 || cellY < 0 || cellX >= collisionWidth || cellY >= collisionHeight)
+	{
+		return true;
+	}
+
+	return blocked[static_cast<size_t>(cellY) * collisionWidth + cellX] != 0;
 }
 
 NAME_SPACE_END
