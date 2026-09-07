@@ -46,9 +46,13 @@ void SpriteAnimatorComponent::Draw()
 	// 월드 앵커는 액터 위치(+오프셋)까지만. 피벗 오프셋은 뷰 변환 뒤에
 	// 화면 공간에서 빼야 뷰가 회전해도 스프라이트 발밑이 앵커에 붙어 있다.
 	// (앵커까지 함께 회전시키면 90°에서 발밑이 옆으로 샌다 - 빌보드)
+	// tint 가 걸려 있으면 실루엣은 그대로 두고 색만 통짜로 덮는다(피격 흰색 플래시 등).
+	const std::unordered_map<char, Color>& palette =
+		tint.has_value() ? SymbolPalette::GetSolidTable(*tint) : SymbolPalette::GetTable();
+
 	Renderer::Get().SubmitPixelsWorld(
 		pixelMap,
-		SymbolPalette::GetTable(),
+		palette,
 		ownerActor->GetPosition() + offset,
 		ownerActor->GetSortingOrder(),
 		SymbolPalette::TransparentSymbol,

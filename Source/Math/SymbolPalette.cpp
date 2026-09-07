@@ -42,6 +42,26 @@ const std::unordered_map<char, Color>& SymbolPalette::GetTable()
 	return table;
 }
 
+const std::unordered_map<char, Color>& SymbolPalette::GetSolidTable(Color color)
+{
+	// 색깔별 캐시. 플래시에 쓰는 색은 사실상 White 하나라 항목이 몇 개 안 된다.
+	static std::unordered_map<int, std::unordered_map<char, Color>> cache;
+
+	auto it = cache.find(static_cast<int>(color));
+	if (it != cache.end())
+	{
+		return it->second;
+	}
+
+	std::unordered_map<char, Color> solid;
+	for (const auto& pair : GetTable())
+	{
+		solid[pair.first] = color;
+	}
+
+	return cache.emplace(static_cast<int>(color), std::move(solid)).first->second;
+}
+
 bool SymbolPalette::Contains(char symbol)
 {
 	return GetTable().find(symbol) != GetTable().end();
