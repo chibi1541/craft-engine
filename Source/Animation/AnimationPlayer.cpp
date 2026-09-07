@@ -8,7 +8,7 @@ void AnimationPlayer::Play(const std::shared_ptr<const AnimationClip>& newClip, 
 {
 	// 같은 클립을 다시 지정한 경우는 무시한다.
 	// 상태 머신이 매 틱 같은 클립을 지정해도 재생이 끊기지 않게 하는 장치.
-	if (clip == newClip && !forceRestart)
+	if (clip != nullptr && clip == newClip && !forceRestart)
 	{
 		return;
 	}
