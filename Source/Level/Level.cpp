@@ -129,7 +129,8 @@ void Level::Draw()
 		// 대신 경계를 cullMargin만큼 넓혀서 큰 그림도 미리 들어오게 한다.
 		if (shouldCull && !cullBounds.Contains(actor->GetPosition()))
 		{
-			continue;
+			if(actor->IsShouldDraw() == false)
+				continue;
 		}
 
 		// 위치 기반 Z-order. 화면에서 아래에 있는 액터가 앞에 보인다.
