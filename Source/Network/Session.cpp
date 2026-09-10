@@ -23,6 +23,26 @@ Session::~Session()
 	SocketUtils::Close(_socket);
 }
 
+int32 Session::GetRecvBufferDataSize() const
+{
+	return _recvBuffer ? _recvBuffer->DataSize() : 0;
+}
+
+int32 Session::GetRecvBufferFreeSize() const
+{
+	return _recvBuffer ? _recvBuffer->FreeSize() : 0;
+}
+
+int32 Session::GetSendBufferRemainSize() const
+{
+	return _sendBuffer ? _sendBuffer->RemainSize() : 0;
+}
+
+int32 Session::GetSendBufferFreeSize() const
+{
+	return _sendBuffer ? _sendBuffer->FreeSize() : 0;
+}
+
 bool Session::Connect()
 {
 	if (IsConnected())
@@ -99,7 +119,9 @@ void Session::ProcessRecv(int32 numOfBytes)
 {
 	_recvBuffer->OnWrite(numOfBytes);
 
-	int32 readSize = OnRecv(_recvBuffer->ReadPos(), numOfBytes);
+	int32 dataSize = _recvBuffer->DataSize();
+
+	int32 readSize = OnRecv(_recvBuffer->ReadPos(), dataSize);
 
 	_recvBuffer->OnRead(readSize);
 }
